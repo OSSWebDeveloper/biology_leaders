@@ -60,7 +60,7 @@ class BotTests(TransactionTestCase):
 
     def test_registration(self):
         replies = self.send('/start')
-        self.assertIn('Familiya', replies[0])
+        self.assertEqual(replies[0], 'Assalomu aleykum. Iltimos ism familyangizni kiring: Masalan : Behruz Hodiyev')
         self.send('Aliyev Ali')
         self.send('raqam emas')  # tugmasiz yozsa qayta so'raydi
         self.assertEqual(User.objects.get(telegram_id=TG_ID).phone, '')

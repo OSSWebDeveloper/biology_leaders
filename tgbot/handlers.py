@@ -99,14 +99,17 @@ async def cmd_start(message: Message, command: CommandObject, state: FSMContext)
         await send_menu(message, user)
         return
     await state.set_state(Registration.name)
-    await message.answer("Ro'yxatdan o'tamiz. Familiya va ismingizni yozing:", reply_markup=ReplyKeyboardRemove())
+    await message.answer(
+        'Assalomu aleykum. Iltimos ism familyangizni kiring: Masalan : Behruz Hodiyev',
+        reply_markup=ReplyKeyboardRemove(),
+    )
 
 
 @router.message(Registration.name, F.text)
 async def reg_name(message: Message, state: FSMContext):
     name = ' '.join(message.text.split())
     if not 3 <= len(name) <= 150 or name.startswith('/'):
-        await message.answer('Iltimos, familiya va ismingizni to\'liq yozing:')
+        await message.answer("Iltimos ism familyangizni to'liq kiring: Masalan : Behruz Hodiyev")
         return
     user = await _user_for(message.from_user)
     await _save_fields(user, full_name=name)
