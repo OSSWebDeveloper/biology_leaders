@@ -6,6 +6,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_POST
 
 from accounts.models import StudyGroup
@@ -15,6 +16,7 @@ from .scoring import GRADES
 from .services import can_start, finalize, save_answer, start_attempt, visible_exams
 
 
+@ensure_csrf_cookie  # landing dagi JS tg_auth ga token yuboradi, sahifada forma yo'q
 def home(request):
     if not request.user.is_authenticated:
         return render(request, 'landing.html')

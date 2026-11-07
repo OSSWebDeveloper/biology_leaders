@@ -7,7 +7,7 @@ import time
 from datetime import timedelta
 from urllib.parse import urlencode
 
-from django.test import TestCase, override_settings
+from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
@@ -85,6 +85,19 @@ class AuthTests(TestCase):
         self.assertEqual(User.objects.get(telegram_id=777).role, 'student')
         self._post(signed_init_data(999))
         self.assertEqual(User.objects.get(telegram_id=999).role, 'admin')
+
+    def test_landing_gives_csrf_cookie_for_telegram_login(self):
+        # Oddiy test client CSRF ni tekshirmaydi: Web App oqimini aynan brauzerdagidek takrorlaymiz
+        browser = Client(enforce_csrf_checks=True)
+        payload = json.dumps({'init_data': signed_init_data(777)})
+        without_token = browser.post(reverse('tg_auth'), payload, content_type='application/json')
+        self.assertEqual(without_token.status_code, 403)
+        browser.get(reverse('home'))
+        token = browser.cookies['csrftoken'].value
+        response = browser.post(reverse('tg_auth'), payload, content_type='application/json',
+                                headers={'X-CSRFToken': token})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(browser.get(reverse('home')).url, reverse('exam_list'))
 
     def test_forged_and_blocked_are_rejected(self):
         self.assertEqual(self._post('user=%7B%22id%22%3A1%7D&hash=abc').status_code, 403)

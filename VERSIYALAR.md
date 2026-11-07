@@ -1,5 +1,12 @@
 # Versiyalar tarixi
 
+## 1.0.2 — 2026-11-07
+
+Web App'dan kirish tuzatildi
+
+- Bosh sahifa CSRF cookie o'rnatadi: Telegramdan kirish 403 bilan rad etilardi
+- Server xatosi endi internet uzilishi deb ko'rsatilmaydi
+
 ## 1.0.1 — 2026-11-07
 
 Start bosilganda yangi salomlashuv matni
