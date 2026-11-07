@@ -225,7 +225,7 @@ class TeacherBotTests(TransactionTestCase):
         self.press('count:ok')
         reply = self.send('Kichik test')[0]
         self.assertIn('1 A\n3 F\n6 2√5; 16/3', reply)
-        self.assertEqual(self.send('1 A\n2 B\n3 F\n4 E\n5 A\n6 1; 2')[0].startswith('Saqlandi'), True)
+        self.assertIn('✅ Test saqlandi.', self.send('1 A\n2 B\n3 F\n4 E\n5 A\n6 1; 2'))
         self.assertFalse(Exam.objects.get().missing_keys())
 
     def test_full_flow_to_ready_message(self):

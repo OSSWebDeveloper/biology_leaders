@@ -1,5 +1,9 @@
 # Versiyalar tarixi
 
+## 1.4.1 — 2026-11-08
+
+Test tekshiruvi tuzatildi
+
 ## 1.4.0 — 2026-11-08
 
 Savollar soni o'rniga uch tur: 4 variantli, 6 variantli, yozma
