@@ -8,7 +8,7 @@ from aiogram import Bot, Dispatcher
 from aiogram.client.session.base import BaseSession
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.methods import GetMe, SendDocument
-from aiogram.types import Chat, Contact, Document, Message, Update, User as TgUser
+from aiogram.types import CallbackQuery, Chat, Contact, Document, Message, Update, User as TgUser
 from asgiref.sync import async_to_sync
 from django.test import TransactionTestCase, override_settings
 from django.utils import timezone
@@ -145,13 +145,20 @@ class TeacherBotTests(TransactionTestCase):
     def make_teacher(self):
         return User.objects.create(username='t', telegram_id=TG_ID, role='teacher', full_name='Ali Valiyev')
 
-    def word(self):
-        return Document(file_id='f', file_unique_id='u', file_name='Mock test.docx', file_size=9)
+    def press(self, data):
+        self.counter += 1
+        user = TgUser(id=TG_ID, is_bot=False, first_name='Ali')
+        shown = Message(message_id=1, date=datetime.datetime.now(), text='x', chat=Chat(id=TG_ID, type='private'))
+        self.session.sent.clear()
+        query = CallbackQuery(id=str(self.counter), from_user=user, chat_instance='c', data=data, message=shown)
+        async_to_sync(self.dp.feed_update)(self.bot, Update(update_id=self.counter, callback_query=query))
+        return [m.text for m in self.session.sent if hasattr(m, 'text')]
 
-    def upload_word(self):
-        with patch('tgbot.teacher_handlers._download', new=AsyncMock(return_value=b'PK\x03\x04word')):
+    def upload(self, name='Mock test.docx', data=b'PK\x03\x04word'):
+        document = Document(file_id='f', file_unique_id='u', file_name=name, file_size=9)
+        with patch('tgbot.teacher_handlers._download', new=AsyncMock(return_value=data)):
             self.send(BTN_NEW)
-            return self.send(document=self.word())
+            return self.send(document=document)
 
     def test_stranger_is_refused_and_not_saved(self):
         replies = self.send('/start')
@@ -166,14 +173,42 @@ class TeacherBotTests(TransactionTestCase):
         self.make_teacher()
         self.assertEqual(self.send('/start', chat_type='group'), [])
 
+    def test_file_is_saved_without_reading(self):
+        self.make_teacher()
+        raw = b'%PDF-buzilgan fayl, JAVOBLAR 1 C'
+        replies = self.upload('test.pdf', raw)
+        self.assertIn('Savollar soni: <b>35</b>', replies[-1])
+        exam = Exam.objects.get()
+        self.assertEqual(exam.questions.count(), 0)
+        with exam.attachment.open('rb') as saved:
+            self.assertEqual(saved.read(), raw)
+
+    def test_count_buttons(self):
+        self.make_teacher()
+        self.upload()
+        markup = self.session.sent[-1].reply_markup
+        self.assertEqual([b.text for b in markup.inline_keyboard[0]], ['+', '-', 'Tayyor'])
+        self.assertIn('<b>36</b>', self.press('count:+')[0])
+        self.assertIn('<b>35</b>', self.press('count:-')[0])
+        self.assertIn('tugmalaridan', self.send('40')[0])
+        self.press('count:ok')
+        exam = Exam.objects.get()
+        kinds = [exam.questions.filter(kind=k).count() for k in ('mcq', 'matching', 'open')]
+        self.assertEqual(kinds, [32, 3, 0])
+        self.assertEqual(self.press('count:+'), ['Bu tugma eskirgan'])
+        self.assertEqual(exam.questions.count(), 35)
+
     def test_full_flow_to_ready_message(self):
         teacher = self.make_teacher()
-        self.assertIn('45 savollik', self.upload_word()[-1])
+        self.upload()
         exam = Exam.objects.get()
         self.assertEqual(exam.created_by, teacher)
+        self.press('count:+')
+        self.press('count:ok')
+        self.assertEqual(exam.questions.count(), 36)
         self.send('Matematika 8-noyabr')
         self.assertIn('Tugash vaqti', self.send('08.11.2030 12:00\n08.11.2030 09:00')[0])
-        self.assertIn('Kalitsiz savollar', self.send('08.11.2030 09:00\n08.11.2030 10:00')[0])
+        self.assertIn('36 2√5', self.send('08.11.2030 09:00\n08.11.2030 10:00')[0])
         exam.refresh_from_db()
         self.assertEqual((exam.title, exam.duration_min), ('Matematika 8-noyabr', 60))
 
@@ -186,7 +221,7 @@ class TeacherBotTests(TransactionTestCase):
         exam.refresh_from_db()
         self.assertFalse(exam.is_published)
         self.session.sent.clear()
-        self.send('\n'.join(f'{n} 2√5; 16/3' for n in range(36, 46)))
+        self.send('36 2√5; 16/3')
         exam.refresh_from_db()
         self.assertTrue(exam.is_published)
         document = next(m for m in self.session.sent if isinstance(m, SendDocument))
@@ -199,7 +234,8 @@ class TeacherBotTests(TransactionTestCase):
 
     def test_cancel_removes_draft(self):
         self.make_teacher()
-        self.upload_word()
+        self.upload()
+        self.press('count:ok')
         self.assertTrue(Exam.objects.exists())
         self.send('/bekor')
         self.assertFalse(Exam.objects.exists())

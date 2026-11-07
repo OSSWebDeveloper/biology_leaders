@@ -8,7 +8,10 @@ from aiogram import BaseMiddleware, F, Router
 from aiogram.filters import Command, CommandObject, CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from aiogram.types import BufferedInputFile, KeyboardButton, Message, ReplyKeyboardMarkup
+from aiogram.types import (
+    BufferedInputFile, CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, Message,
+    ReplyKeyboardMarkup,
+)
 from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -21,7 +24,7 @@ from accounts.services import get_or_create_tg_user
 from exams.forms import PdfImportForm
 from exams.models import Exam, Question
 from exams.pdf_import import PdfImportError
-from exams.services import attach_test_file, discard_exam, regrade_exam
+from exams.services import DEFAULT_QUESTION_COUNT, create_answer_sheet, discard_exam, regrade_exam, save_test_file
 
 from . import notify
 
@@ -31,16 +34,33 @@ BTN_NEW = '➕ Yangi test'
 BTN_LIST = '📋 Testlarim'
 MAX_DOWNLOAD_MB = 20  # Bot API bundan kattasini yuklab bermaydi
 DEFAULT_DURATION_MIN = 150
+MIN_QUESTIONS, MAX_QUESTIONS = 1, 99
+
+count_keyboard = InlineKeyboardMarkup(inline_keyboard=[[
+    InlineKeyboardButton(text='+', callback_data='count:+'),
+    InlineKeyboardButton(text='-', callback_data='count:-'),
+    InlineKeyboardButton(text='Tayyor', callback_data='count:ok'),
+]])
 
 menu = ReplyKeyboardMarkup(
     keyboard=[[KeyboardButton(text=BTN_NEW), KeyboardButton(text=BTN_LIST)]], resize_keyboard=True)
 
 TIMES_HELP = ("Boshlanish va tugash vaqtini ikki qatorda yozing:\n\n"
               "<code>08.11.2026 09:00\n08.11.2026 12:00</code>")
-KEYS_HELP = ("Javoblarni qatorlar bilan yuboring:\n\n"
-             "<code>1 A\n2 C\n33 F\n36 2√5; 16/3</code>\n\n"
-             "Yozma savolda a) va b) javoblari <code>;</code> bilan ajratiladi. "
-             "Bir xabarda ham, bo'lib ham yuborsa bo'ladi.")
+
+
+def keys_help(numbers):
+    """Yozma savollar (36 dan) bo'lsagina ularning namunasi ko'rsatiladi."""
+    has_open = any(number > 35 for number in numbers)
+    sample = '1 A\n2 C\n33 F' + ('\n36 2√5; 16/3' if has_open else '')
+    note = "Yozma savolda a) va b) javoblari <code>;</code> bilan ajratiladi. " if has_open else ''
+    return (f"Javoblarni qatorlar bilan yuboring:\n\n<code>{sample}</code>\n\n"
+            f"{note}Bir xabarda ham, bo'lib ham yuborsa bo'ladi.")
+
+
+def _count_text(count):
+    return f'Savollar soni: <b>{count}</b>'
+
 
 _DATETIME = re.compile(r'(\d{1,2})[./-](\d{1,2})[./-](\d{4})[ ,T]+(\d{1,2})[:.](\d{2})')
 _LETTER_LINE = re.compile(r'^(\d{1,2})\s*[-.):]?\s*([A-Fa-f])$')
@@ -49,6 +69,7 @@ _VALUE_LINE = re.compile(r'^(\d{1,2})(?:\s*[.):]\s*|\s+)(.+)$')
 
 class NewExam(StatesGroup):
     file = State()
+    count = State()
     title = State()
     times = State()
     keys = State()
@@ -58,7 +79,8 @@ class TeacherOnly(BaseMiddleware):
     """Faqat shaxsiy chatda va faqat o'qituvchi/adminga javob beradi. Begona odam bazaga yozilmaydi."""
 
     async def __call__(self, handler, event, data):
-        if event.chat.type != 'private' or not event.from_user:
+        chat = event.message.chat if isinstance(event, CallbackQuery) else event.chat
+        if chat.type != 'private' or not event.from_user:
             return None
         teacher = await _teacher_for(event.from_user.id)
         if teacher is None:
@@ -70,6 +92,7 @@ class TeacherOnly(BaseMiddleware):
 
 
 router.message.outer_middleware(TeacherOnly())
+router.callback_query.outer_middleware(TeacherOnly())
 
 
 @sync_to_async
@@ -146,20 +169,29 @@ def _apply_keys(exam_id, text):
 
 @sync_to_async
 def _create_from_file(teacher, name, data):
-    upload = SimpleUploadedFile(name, data)
-    form = PdfImportForm({}, {'pdf': upload})
+    """Fayl o'qilmaydi: faqat kengaytmasi, hajmi va Word sarlavhasi tekshiriladi, keyin o'zgarishsiz saqlanadi."""
+    form = PdfImportForm({}, {'pdf': SimpleUploadedFile(name, data)})
     if not form.is_valid():
         raise PdfImportError(' '.join(form.errors['pdf']))
-    with transaction.atomic():
-        exam = Exam.objects.create(title=PurePath(name).stem[:200] or 'Test', created_by=teacher,
-                                   status=Exam.Status.DRAFT)
-        note = attach_test_file(exam, form.cleaned_data['pdf'])
-    return exam.pk, note
+    exam = Exam.objects.create(title=PurePath(name).stem[:200] or 'Test', created_by=teacher,
+                               status=Exam.Status.DRAFT)
+    save_test_file(exam, name.lower().rsplit('.', 1)[-1], data)
+    return exam.pk
+
+
+@sync_to_async
+def _create_questions(exam_id, count):
+    create_answer_sheet(Exam.objects.get(pk=exam_id), count)
 
 
 @sync_to_async
 def _set_fields(exam_id, **fields):
     Exam.objects.filter(pk=exam_id).update(**fields)
+
+
+@sync_to_async
+def _question_numbers(exam_id):
+    return list(Question.objects.filter(exam_id=exam_id).values_list('number', flat=True))
 
 
 @sync_to_async
@@ -297,7 +329,8 @@ async def cmd_keys(message: Message, command: CommandObject, state: FSMContext, 
     await _abandon_draft(state)
     await state.set_state(NewExam.keys)
     await state.update_data(exam_id=exam.pk, creating=False, editing=exam.is_published)
-    await message.answer(KEYS_HELP, parse_mode='HTML')
+    numbers = await _question_numbers(exam.pk)
+    await message.answer(keys_help(numbers), parse_mode='HTML')
 
 
 @router.message(F.text == BTN_NEW)
@@ -315,21 +348,52 @@ async def got_file(message: Message, state: FSMContext, teacher):
     if (document.file_size or 0) > MAX_DOWNLOAD_MB * 1024 * 1024:
         await message.answer(f'Fayl {MAX_DOWNLOAD_MB} MB dan oshmasin.')
         return
-    await message.answer("Fayl o'qilmoqda…")
     data = await _download(message.bot, document)
     try:
-        exam_id, note = await _create_from_file(teacher, document.file_name or 'test.pdf', data)
+        exam_id = await _create_from_file(teacher, document.file_name or 'test.pdf', data)
     except PdfImportError as exc:
         await message.answer(f"{exc}\nBoshqa fayl yuboring yoki /bekor.")
         return
-    await state.update_data(exam_id=exam_id, creating=True)
-    await state.set_state(NewExam.title)
-    await message.answer(f'{note}\n\nTest nomini yozing:')
+    await state.update_data(exam_id=exam_id, creating=True, count=DEFAULT_QUESTION_COUNT)
+    await state.set_state(NewExam.count)
+    await message.answer(_count_text(DEFAULT_QUESTION_COUNT), parse_mode='HTML', reply_markup=count_keyboard)
 
 
 @router.message(NewExam.file)
 async def file_expected(message: Message):
     await message.answer('PDF yoki Word faylni hujjat sifatida yuboring.')
+
+
+@router.callback_query(NewExam.count, F.data.in_({'count:+', 'count:-'}))
+async def change_count(callback: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    count = data['count'] + (1 if callback.data == 'count:+' else -1)
+    if not MIN_QUESTIONS <= count <= MAX_QUESTIONS:
+        await callback.answer(f'{MIN_QUESTIONS}–{MAX_QUESTIONS} oralig\'ida bo\'lsin')
+        return
+    await state.update_data(count=count)
+    await callback.message.edit_text(_count_text(count), parse_mode='HTML', reply_markup=count_keyboard)
+    await callback.answer()
+
+
+@router.callback_query(NewExam.count, F.data == 'count:ok')
+async def count_done(callback: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    await _create_questions(data['exam_id'], data['count'])
+    await state.set_state(NewExam.title)
+    await callback.message.edit_text(_count_text(data['count']), parse_mode='HTML')
+    await callback.answer()
+    await callback.message.answer('Test nomini yozing:')
+
+
+@router.callback_query()
+async def stale_button(callback: CallbackQuery):
+    await callback.answer('Bu tugma eskirgan')
+
+
+@router.message(NewExam.count)
+async def count_expected(message: Message):
+    await message.answer('Yuqoridagi +, - va Tayyor tugmalaridan foydalaning.')
 
 
 @router.message(NewExam.title, F.text)
@@ -356,11 +420,7 @@ async def got_times(message: Message, state: FSMContext):
     await _set_fields(data['exam_id'], opens_at=opens, closes_at=closes,
                       duration_min=max(1, min(DEFAULT_DURATION_MIN, window)))
     await state.set_state(NewExam.keys)
-    saved, errors, missing = await _apply_keys(data['exam_id'], '')
-    if not missing:  # PDF kaliti to'liq chiqqan
-        await _finish(message, state, data['exam_id'])
-        return
-    await message.answer(f"{KEYS_HELP}\n\nKalitsiz savollar: {_format_missing(missing)}", parse_mode='HTML')
+    await message.answer(keys_help(await _question_numbers(data['exam_id'])), parse_mode='HTML')
 
 
 @router.message(NewExam.keys, F.text)

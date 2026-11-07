@@ -12,6 +12,8 @@ from .models import Answer, Attempt, Exam, Question
 from .pdf_import import PdfImportError, slice_pdf, strip_key_pages
 from .scoring import grade_attempt
 
+DEFAULT_QUESTION_COUNT = 35
+
 
 def exam_by_code(code):
     """Kod bo'yicha e'lon qilingan test; o'quvchi testga faqat shu yo'l bilan kiradi."""
@@ -112,11 +114,18 @@ def import_pdf_into(exam, data, replace=False):
     return created, keyed
 
 
-def create_answer_sheet(exam):
-    """Word test uchun standart javob varag'i: savol matni guruhga yuborilgan faylda bo'ladi."""
+def create_answer_sheet(exam, count=DEFAULT_QUESTION_COUNT):
+    """Javob varag'i: savol matni guruhga yuborilgan faylda bo'ladi."""
     def kind(number):
         return Question.Kind.MCQ if number <= 32 else Question.Kind.MATCHING if number <= 35 else Question.Kind.OPEN
-    Question.objects.bulk_create(Question(exam=exam, number=n, kind=kind(n)) for n in range(1, 46))
+    Question.objects.bulk_create(Question(exam=exam, number=n, kind=kind(n)) for n in range(1, count + 1))
+
+
+def save_test_file(exam, extension, data):
+    """Faylni o'qimasdan, o'zgarishsiz saqlaydi."""
+    if exam.attachment:
+        exam.attachment.delete(save=False)
+    exam.attachment.save(f'test.{extension}', ContentFile(data), save=True)
 
 
 @transaction.atomic
@@ -136,7 +145,7 @@ def attach_test_file(exam, upload, replace=False):
                     raise
                 # skaner yoki boshqa ko'rinishdagi PDF: savol faylda qoladi, javob varag'i yetarli
                 create_answer_sheet(exam)
-                note = ("PDF dan savollar ajratilmadi, 45 savollik javob varag'i yaratildi. "
+                note = (f"PDF dan savollar ajratilmadi, {DEFAULT_QUESTION_COUNT} savollik javob varag'i yaratildi. "
                         "O'quvchi savolni fayldan o'qiydi.")
             else:
                 note = (f"{created} ta savol kesib olindi, {keyed} tasiga kalit topildi. "
@@ -148,10 +157,9 @@ def attach_test_file(exam, upload, replace=False):
                 question.image.delete(save=False)
             exam.questions.all().delete()
         create_answer_sheet(exam)
-        note = "Word fayl saqlandi va 45 savollik javob varag'i yaratildi. Javoblar kalitini kiriting."
-    if exam.attachment:
-        exam.attachment.delete(save=False)
-    exam.attachment.save(f'test.{extension}', ContentFile(data), save=True)
+        note = (f"Word fayl saqlandi va {DEFAULT_QUESTION_COUNT} savollik javob varag'i yaratildi. "
+                "Javoblar kalitini kiriting.")
+    save_test_file(exam, extension, data)
     return note
 
 

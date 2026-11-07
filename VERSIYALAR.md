@@ -1,5 +1,12 @@
 # Versiyalar tarixi
 
+## 1.2.0 — 2026-11-07
+
+O'qituvchi boti faylni o'qimaydi, savollar soni tugmalar bilan
+
+- Fayl o'zgarishsiz saqlanadi va guruhga shu holida ketadi
+- Savollar soni standart 35, tugmalar: +, -, Tayyor
+
 ## 1.1.1 — 2026-11-07
 
 Guruh nusxasida bo'sh sahifa qolmaydi

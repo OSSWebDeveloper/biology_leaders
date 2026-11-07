@@ -388,14 +388,14 @@ class PdfUploadViewTests(TestCase):
             exam.refresh_from_db()
             self.assertTrue(exam.attachment.name.endswith('.docx'))
             kinds = [exam.questions.filter(kind=k).count() for k in ('mcq', 'matching', 'open')]
-            self.assertEqual(kinds, [32, 3, 10])
+            self.assertEqual(kinds, [32, 3, 0])
             self.assertEqual(self.client.get(reverse('t_exam', args=[exam.pk])).status_code, 200)
             exam.status = Exam.Status.PUBLISHED
             exam.save(update_fields=['status'])
             self.client.force_login(make_user(52))
             response = self.client.post(reverse('attempt_start', args=[exam.access_code]), follow=True)
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(len(response.context['payload']['questions']), 45)
+            self.assertEqual(len(response.context['payload']['questions']), 35)
 
     def test_second_upload_keeps_questions(self):
         from django.core.files.uploadedfile import SimpleUploadedFile
