@@ -1,5 +1,12 @@
 # Versiyalar tarixi
 
+## 1.4.0 — 2026-11-08
+
+Savollar soni o'rniga uch tur: 4 variantli, 6 variantli, yozma
+
+- Har bir tur soni + va - tugmalari bilan o'zgaradi, boshida 32, 3, 0
+- Javob namunasi testdagi haqiqiy raqamlardan tuziladi
+
 ## 1.3.0 — 2026-11-07
 
 Test yaratish va joriy etish ajratildi

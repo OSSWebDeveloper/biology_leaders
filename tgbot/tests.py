@@ -177,33 +177,63 @@ class TeacherBotTests(TransactionTestCase):
         self.make_teacher()
         raw = b'%PDF-buzilgan fayl, JAVOBLAR 1 C'
         replies = self.upload('test.pdf', raw)
-        self.assertIn('Savollar soni: <b>35</b>', replies[-1])
+        self.assertIn('jami: <b>35</b>', replies[-1])
         exam = Exam.objects.get()
         self.assertEqual(exam.questions.count(), 0)
         with exam.attachment.open('rb') as saved:
             self.assertEqual(saved.read(), raw)
 
-    def test_count_buttons(self):
+    def test_kind_buttons(self):
         self.make_teacher()
         self.upload()
-        markup = self.session.sent[-1].reply_markup
-        self.assertEqual([b.text for b in markup.inline_keyboard[0]], ['+', '-', 'Tayyor'])
-        self.assertIn('<b>36</b>', self.press('count:+')[0])
-        self.assertIn('<b>35</b>', self.press('count:-')[0])
-        self.assertIn('tugmalaridan', self.send('40')[0])
+        rows = self.session.sent[-1].reply_markup.inline_keyboard
+        self.assertEqual([[b.text for b in row] for row in rows], [
+            ['4 variantli: 32', '-', '+'], ['6 variantli: 3', '-', '+'], ['Yozma ish: 0', '-', '+'], ['Tayyor']])
+        self.assertIn('<b>36</b>', self.press('count:open:+')[0])
+        self.assertEqual(self.session.sent[0].reply_markup.inline_keyboard[2][0].text, 'Yozma ish: 1')
+        self.assertIn('<b>35</b>', self.press('count:mcq:-')[0])
+        self.assertIn('<b>34</b>', self.press('count:matching:-')[0])
+        self.assertIn('tugmalardan', self.send('40')[0])
+        self.press('count:noop')
         self.press('count:ok')
         exam = Exam.objects.get()
         kinds = [exam.questions.filter(kind=k).count() for k in ('mcq', 'matching', 'open')]
-        self.assertEqual(kinds, [32, 3, 0])
-        self.assertEqual(self.press('count:+'), ['Bu tugma eskirgan'])
-        self.assertEqual(exam.questions.count(), 35)
+        self.assertEqual(kinds, [31, 2, 1])
+        self.assertEqual(list(exam.questions.filter(kind='open').values_list('number', flat=True)), [34])
+        self.assertEqual(self.press('count:mcq:+'), ['Bu tugma eskirgan'])
+        self.assertEqual(exam.questions.count(), 34)
+
+    def test_kind_limits(self):
+        self.make_teacher()
+        self.upload()
+        self.press('count:open:-')  # 0 dan pastga tushmaydi
+        self.assertIn("oralig'ida", self.session.sent[-1].text)
+        for _ in range(3):
+            self.press('count:matching:-')
+        for _ in range(32):
+            self.press('count:mcq:-')
+        self.press('count:ok')  # bitta ham savol yo'q
+        self.assertIn('Kamida', self.session.sent[-1].text)
+        self.assertEqual(Exam.objects.get().questions.count(), 0)
+
+    def test_keys_sample_follows_real_numbers(self):
+        self.make_teacher()
+        self.upload()
+        for _ in range(30):
+            self.press('count:mcq:-')
+        self.press('count:open:+')
+        self.press('count:ok')
+        reply = self.send('Kichik test')[0]
+        self.assertIn('1 A\n3 F\n6 2√5; 16/3', reply)
+        self.assertEqual(self.send('1 A\n2 B\n3 F\n4 E\n5 A\n6 1; 2')[0].startswith('Saqlandi'), True)
+        self.assertFalse(Exam.objects.get().missing_keys())
 
     def test_full_flow_to_ready_message(self):
         teacher = self.make_teacher()
         self.upload()
         exam = Exam.objects.get()
         self.assertEqual(exam.created_by, teacher)
-        self.press('count:+')
+        self.press('count:open:+')
         self.press('count:ok')
         self.assertEqual(exam.questions.count(), 36)
         # nomdan keyin vaqt emas, javoblar so'raladi

@@ -24,7 +24,7 @@ from accounts.services import get_or_create_tg_user
 from exams.forms import PdfImportForm
 from exams.models import Exam, Question
 from exams.pdf_import import PdfImportError
-from exams.services import DEFAULT_QUESTION_COUNT, create_answer_sheet, discard_exam, regrade_exam, save_test_file
+from exams.services import DEFAULT_SHEET, create_answer_sheet, discard_exam, regrade_exam, save_test_file
 
 from . import notify
 
@@ -35,13 +35,8 @@ BTN_LIST = '📋 Testlarim'
 BTN_LAUNCH = '🚀 Joriy etish'
 MAX_DOWNLOAD_MB = 20  # Bot API bundan kattasini yuklab bermaydi
 DEFAULT_DURATION_MIN = 150
-MIN_QUESTIONS, MAX_QUESTIONS = 1, 99
-
-count_keyboard = InlineKeyboardMarkup(inline_keyboard=[[
-    InlineKeyboardButton(text='+', callback_data='count:+'),
-    InlineKeyboardButton(text='-', callback_data='count:-'),
-    InlineKeyboardButton(text='Tayyor', callback_data='count:ok'),
-]])
+MAX_QUESTIONS = 99  # kalit qatorida raqam ikki xonali
+KIND_LABELS = {'mcq': '4 variantli', 'matching': '6 variantli', 'open': 'Yozma ish'}
 
 menu = ReplyKeyboardMarkup(
     keyboard=[[KeyboardButton(text=BTN_NEW), KeyboardButton(text=BTN_LAUNCH)], [KeyboardButton(text=BTN_LIST)]],
@@ -54,17 +49,26 @@ def times_help():
             f"<code>{tomorrow:%d.%m.%Y} 09:00\n{tomorrow:%d.%m.%Y} 12:00</code>")
 
 
-def keys_help(numbers):
-    """Yozma savollar (36 dan) bo'lsagina ularning namunasi ko'rsatiladi."""
-    has_open = any(number > 35 for number in numbers)
-    sample = '1 A\n2 C\n33 F' + ('\n36 2√5; 16/3' if has_open else '')
-    note = "Yozma savolda a) va b) javoblari <code>;</code> bilan ajratiladi. " if has_open else ''
+def keys_help(first):
+    """Namuna testdagi haqiqiy raqamlardan tuziladi: first = {tur: birinchi raqam}."""
+    samples = {'mcq': 'A', 'matching': 'F', 'open': '2√5; 16/3'}
+    sample = '\n'.join(f'{first[kind]} {value}' for kind, value in samples.items() if kind in first)
+    note = "Yozma savolda a) va b) javoblari <code>;</code> bilan ajratiladi. " if 'open' in first else ''
     return (f"Javoblarni qatorlar bilan yuboring:\n\n<code>{sample}</code>\n\n"
             f"{note}Bir xabarda ham, bo'lib ham yuborsa bo'ladi.")
 
 
-def _count_text(count):
-    return f'Savollar soni: <b>{count}</b>'
+def _counts_text(counts):
+    return f'Savollar, jami: <b>{sum(counts.values())}</b>'
+
+
+def _counts_keyboard(counts):
+    rows = [[InlineKeyboardButton(text=f'{label}: {counts[kind]}', callback_data='count:noop'),
+             InlineKeyboardButton(text='-', callback_data=f'count:{kind}:-'),
+             InlineKeyboardButton(text='+', callback_data=f'count:{kind}:+')]
+            for kind, label in KIND_LABELS.items()]
+    rows.append([InlineKeyboardButton(text='Tayyor', callback_data='count:ok')])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 _DATETIME = re.compile(r'(\d{1,2})[./-](\d{1,2})[./-](\d{4})[ ,T]+(\d{1,2})[:.](\d{2})')
@@ -188,8 +192,8 @@ def _create_from_file(teacher, name, data):
 
 
 @sync_to_async
-def _create_questions(exam_id, count):
-    create_answer_sheet(Exam.objects.get(pk=exam_id), count)
+def _create_questions(exam_id, counts):
+    create_answer_sheet(Exam.objects.get(pk=exam_id), counts)
 
 
 @sync_to_async
@@ -198,8 +202,11 @@ def _set_fields(exam_id, **fields):
 
 
 @sync_to_async
-def _question_numbers(exam_id):
-    return list(Question.objects.filter(exam_id=exam_id).values_list('number', flat=True))
+def _first_numbers(exam_id):
+    first = {}
+    for kind, number in Question.objects.filter(exam_id=exam_id).order_by('number').values_list('kind', 'number'):
+        first.setdefault(kind, number)
+    return first
 
 
 @sync_to_async
@@ -366,8 +373,7 @@ async def cmd_keys(message: Message, command: CommandObject, state: FSMContext, 
     await _leave_flow(state)
     await state.set_state(NewExam.keys)
     await state.update_data(exam_id=exam.pk, creating=False, editing=exam.is_published)
-    numbers = await _question_numbers(exam.pk)
-    await message.answer(keys_help(numbers), parse_mode='HTML')
+    await message.answer(keys_help(await _first_numbers(exam.pk)), parse_mode='HTML')
 
 
 @router.message(F.text == BTN_NEW)
@@ -416,9 +422,10 @@ async def got_file(message: Message, state: FSMContext, teacher):
     except PdfImportError as exc:
         await message.answer(f"{exc}\nBoshqa fayl yuboring yoki /bekor.")
         return
-    await state.update_data(exam_id=exam_id, creating=True, count=DEFAULT_QUESTION_COUNT)
+    counts = dict(DEFAULT_SHEET)
+    await state.update_data(exam_id=exam_id, creating=True, counts=counts)
     await state.set_state(NewExam.count)
-    await message.answer(_count_text(DEFAULT_QUESTION_COUNT), parse_mode='HTML', reply_markup=count_keyboard)
+    await message.answer(_counts_text(counts), parse_mode='HTML', reply_markup=_counts_keyboard(counts))
 
 
 @router.message(NewExam.file)
@@ -426,26 +433,38 @@ async def file_expected(message: Message):
     await message.answer('PDF yoki Word faylni hujjat sifatida yuboring.')
 
 
-@router.callback_query(NewExam.count, F.data.in_({'count:+', 'count:-'}))
-async def change_count(callback: CallbackQuery, state: FSMContext):
-    data = await state.get_data()
-    count = data['count'] + (1 if callback.data == 'count:+' else -1)
-    if not MIN_QUESTIONS <= count <= MAX_QUESTIONS:
-        await callback.answer(f'{MIN_QUESTIONS}–{MAX_QUESTIONS} oralig\'ida bo\'lsin')
-        return
-    await state.update_data(count=count)
-    await callback.message.edit_text(_count_text(count), parse_mode='HTML', reply_markup=count_keyboard)
+@router.callback_query(NewExam.count, F.data == 'count:noop')
+async def count_label(callback: CallbackQuery):
     await callback.answer()
 
 
 @router.callback_query(NewExam.count, F.data == 'count:ok')
 async def count_done(callback: CallbackQuery, state: FSMContext):
     data = await state.get_data()
-    await _create_questions(data['exam_id'], data['count'])
+    counts = data['counts']
+    if not sum(counts.values()):
+        await callback.answer('Kamida bitta savol bo\'lsin')
+        return
+    await _create_questions(data['exam_id'], counts)
     await state.set_state(NewExam.title)
-    await callback.message.edit_text(_count_text(data['count']), parse_mode='HTML')
+    summary = '\n'.join(f'{label}: {counts[kind]}' for kind, label in KIND_LABELS.items())
+    await callback.message.edit_text(f'{_counts_text(counts)}\n{summary}', parse_mode='HTML')
     await callback.answer()
     await callback.message.answer('Test nomini yozing:')
+
+
+@router.callback_query(NewExam.count, F.data.regexp(r'^count:(mcq|matching|open):[+-]$'))
+async def change_count(callback: CallbackQuery, state: FSMContext):
+    _, kind, sign = callback.data.split(':')
+    data = await state.get_data()
+    counts = dict(data['counts'])
+    counts[kind] += 1 if sign == '+' else -1
+    if counts[kind] < 0 or sum(counts.values()) > MAX_QUESTIONS:
+        await callback.answer(f"Jami 0–{MAX_QUESTIONS} oralig'ida bo'lsin")
+        return
+    await state.update_data(counts=counts)
+    await callback.message.edit_text(_counts_text(counts), parse_mode='HTML', reply_markup=_counts_keyboard(counts))
+    await callback.answer()
 
 
 @router.callback_query()
@@ -455,7 +474,7 @@ async def stale_button(callback: CallbackQuery):
 
 @router.message(NewExam.count)
 async def count_expected(message: Message):
-    await message.answer('Yuqoridagi +, - va Tayyor tugmalaridan foydalaning.')
+    await message.answer('Yuqoridagi tugmalardan foydalaning: +, - va Tayyor.')
 
 
 @router.message(NewExam.title, F.text)
@@ -467,7 +486,7 @@ async def got_title(message: Message, state: FSMContext):
     data = await state.get_data()
     await _set_fields(data['exam_id'], title=title)
     await state.set_state(NewExam.keys)
-    await message.answer(keys_help(await _question_numbers(data['exam_id'])), parse_mode='HTML')
+    await message.answer(keys_help(await _first_numbers(data['exam_id'])), parse_mode='HTML')
 
 
 @router.message(NewExam.keys, F.text)

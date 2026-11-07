@@ -49,8 +49,8 @@ O'qituvchi boti (`TEACHER_BOT_TOKEN`), alohida oynada:
 ## O'quvchi testga qanday kiradi
 
 O'quvchida testlar ro'yxati yo'q: kirish faqat kod bilan. O'qituvchi botiga fayl yuboriladi (bot uni o'qimaydi va
-o'zgartirmaydi, javoblar yozilgan fayl yubormang), savollar soni `+`, `-`, `Tayyor` tugmalari bilan tanlanadi
-(standart 35), nom va javoblar yoziladi. Vaqt «Joriy etish»da so'raladi; shundan keyin bot fayl, kirish kodi, boshlanish va tugash vaqti yozilgan tayyor xabarni
+o'zgartirmaydi, javoblar yozilgan fayl yubormang), 4 variantli, 6 variantli va yozma savollar soni `+`, `-` tugmalari bilan tanlanadi
+(boshida 32, 3, 0), nom va javoblar yoziladi. Vaqt «Joriy etish»da so'raladi; shundan keyin bot fayl, kirish kodi, boshlanish va tugash vaqti yozilgan tayyor xabarni
 qaytaradi, o'qituvchi uni guruhga uzatadi. O'qituvchi botiga faqat `teacher` yoki `admin` roli kira oladi:
 `manage.py rol <telegram_id> teacher`.
 

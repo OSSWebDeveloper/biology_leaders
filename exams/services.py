@@ -12,7 +12,8 @@ from .models import Answer, Attempt, Exam, Question
 from .pdf_import import PdfImportError, slice_pdf, strip_key_pages
 from .scoring import grade_attempt
 
-DEFAULT_QUESTION_COUNT = 35
+DEFAULT_SHEET = {'mcq': 32, 'matching': 3, 'open': 0}
+DEFAULT_QUESTION_COUNT = sum(DEFAULT_SHEET.values())
 
 
 def exam_by_code(code):
@@ -114,11 +115,11 @@ def import_pdf_into(exam, data, replace=False):
     return created, keyed
 
 
-def create_answer_sheet(exam, count=DEFAULT_QUESTION_COUNT):
-    """Javob varag'i: savol matni guruhga yuborilgan faylda bo'ladi."""
-    def kind(number):
-        return Question.Kind.MCQ if number <= 32 else Question.Kind.MATCHING if number <= 35 else Question.Kind.OPEN
-    Question.objects.bulk_create(Question(exam=exam, number=n, kind=kind(n)) for n in range(1, count + 1))
+def create_answer_sheet(exam, counts=None):
+    """Javob varag'i: savol matni guruhga yuborilgan faylda, raqamlar turlar bo'yicha ketma-ket."""
+    counts = counts or DEFAULT_SHEET
+    kinds = [kind for kind in ('mcq', 'matching', 'open') for _ in range(counts.get(kind, 0))]
+    Question.objects.bulk_create(Question(exam=exam, number=n, kind=kind) for n, kind in enumerate(kinds, 1))
 
 
 def save_test_file(exam, extension, data):
