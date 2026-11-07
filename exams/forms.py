@@ -1,41 +1,34 @@
 from django import forms
 
-from accounts.models import StudyGroup
-
 from .models import Exam, Question
 
 MAX_PDF_MB = 30
+WORD_SIGNATURES = (b'PK\x03\x04', b'\xd0\xcf\x11\xe0')  # .docx (zip), .doc (OLE)
 
 
 class ExamForm(forms.ModelForm):
     class Meta:
         model = Exam
-        fields = ['title', 'subject', 'description', 'duration_min', 'groups', 'opens_at', 'closes_at',
-                  'max_attempts', 'show_answers', 'is_public', 'weight_mcq', 'weight_matching', 'weight_open']
+        fields = ['title', 'subject', 'description', 'duration_min', 'opens_at', 'closes_at',
+                  'max_attempts', 'show_answers', 'weight_mcq', 'weight_matching', 'weight_open']
         widgets = {
             'description': forms.Textarea(attrs={'rows': 2}),
             'opens_at': forms.DateTimeInput(attrs={'type': 'datetime-local'}, format='%Y-%m-%dT%H:%M'),
             'closes_at': forms.DateTimeInput(attrs={'type': 'datetime-local'}, format='%Y-%m-%dT%H:%M'),
-            'groups': forms.CheckboxSelectMultiple,
         }
 
-    def __init__(self, *args, user, **kwargs):
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        for name in ('opens_at', 'closes_at'):
+        for name, label in (('opens_at', 'Boshlanish vaqti'), ('closes_at', 'Tugash vaqti')):
             self.fields[name].input_formats = ['%Y-%m-%dT%H:%M']
-        groups = StudyGroup.objects.all()
-        if not user.is_admin_role:
-            groups = groups.filter(teacher=user)
-            del self.fields['is_public']  # hammaga ochish faqat adminda
-        self.fields['groups'].queryset = groups
-        if not groups.exists():
-            self.fields['groups'].help_text = "Hali guruh yo'q. Avval «Guruhlar» bo'limida yarating."
+            self.fields[name].required = True
+            self.fields[name].label = label
 
     def clean(self):
         data = super().clean()
         opens, closes = data.get('opens_at'), data.get('closes_at')
         if opens and closes and closes <= opens:
-            self.add_error('closes_at', 'Yopilish vaqti ochilishdan keyin bo\'lsin')
+            self.add_error('closes_at', "Tugash vaqti boshlanishdan keyin bo'lsin")
         return data
 
 
@@ -73,13 +66,19 @@ class QuestionForm(forms.ModelForm):
 
 
 class PdfImportForm(forms.Form):
-    pdf = forms.FileField(label='PDF fayl')
+    pdf = forms.FileField(label='Test fayli (PDF yoki Word)')
     replace = forms.BooleanField(label="Mavjud savollarni almashtirish", required=False)
 
     def clean_pdf(self):
         pdf = self.cleaned_data['pdf']
         if pdf.size > MAX_PDF_MB * 1024 * 1024:
             raise forms.ValidationError(f'Fayl {MAX_PDF_MB} MB dan oshmasin')
-        if not pdf.name.lower().endswith('.pdf'):
-            raise forms.ValidationError('Faqat PDF fayl')
+        name = pdf.name.lower()
+        if not name.endswith(('.pdf', '.doc', '.docx')):
+            raise forms.ValidationError('Faqat PDF yoki Word fayl')
+        if not name.endswith('.pdf'):
+            head = pdf.read(4)
+            pdf.seek(0)
+            if head not in WORD_SIGNATURES:
+                raise forms.ValidationError("Word faylni o'qib bo'lmadi")
         return pdf

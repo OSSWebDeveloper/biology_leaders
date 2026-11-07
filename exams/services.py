@@ -3,30 +3,31 @@ from datetime import timedelta
 
 from django.core.files.base import ContentFile
 from django.db import IntegrityError, transaction
-from django.db.models import Max, Q
+from django.db.models import Max
 from django.utils import timezone
 
 from tgbot import notify
 
 from .models import Answer, Attempt, Exam, Question
-from .pdf_import import slice_pdf
+from .pdf_import import PdfImportError, slice_pdf, strip_key_pages
 from .scoring import grade_attempt
 
 
-def visible_exams(user):
-    """O'quvchi ko'ra oladigan e'lon qilingan testlar."""
-    return Exam.objects.filter(
-        Q(is_public=True) | Q(groups__students=user),
-        status=Exam.Status.PUBLISHED,
-    ).distinct()
+def exam_by_code(code):
+    """Kod bo'yicha e'lon qilingan test; o'quvchi testga faqat shu yo'l bilan kiradi."""
+    code = (code or '').strip().upper()
+    return Exam.objects.filter(access_code=code, status=Exam.Status.PUBLISHED).first() if code else None
 
 
 def can_start(exam, user):
     """(ruxsat, sabab)"""
     if not exam.is_published:
         return False, "Test hali e'lon qilinmagan"
-    if not exam.is_open_now():
-        return False, 'Test hozir ochiq emas'
+    now = timezone.now()
+    if exam.opens_at and now < exam.opens_at:
+        return False, f"Test {timezone.localtime(exam.opens_at):%d.%m.%Y %H:%M} da boshlanadi"
+    if exam.closes_at and now >= exam.closes_at:
+        return False, 'Test vaqti tugagan'
     if exam.max_attempts:
         used = exam.attempts.filter(student=user, finished_at__isnull=False).count()
         if used >= exam.max_attempts:
@@ -109,3 +110,53 @@ def import_pdf_into(exam, data, replace=False):
             created += 1
             keyed += int(bool(question.correct))
     return created, keyed
+
+
+def create_answer_sheet(exam):
+    """Word test uchun standart javob varag'i: savol matni guruhga yuborilgan faylda bo'ladi."""
+    def kind(number):
+        return Question.Kind.MCQ if number <= 32 else Question.Kind.MATCHING if number <= 35 else Question.Kind.OPEN
+    Question.objects.bulk_create(Question(exam=exam, number=n, kind=kind(n)) for n in range(1, 46))
+
+
+@transaction.atomic
+def attach_test_file(exam, upload, replace=False):
+    """Test faylini saqlaydi va kerak bo'lsa savollarni yaratadi. Natija matnini qaytaradi."""
+    extension = upload.name.lower().rsplit('.', 1)[-1]
+    data = upload.read()
+    has_questions = exam.questions.exists()
+    note = 'Test fayli saqlandi.'
+    if extension == 'pdf':
+        clean = strip_key_pages(data)  # guruhga javoblarsiz nusxa ketadi
+        if replace or not has_questions:
+            try:
+                created, keyed = import_pdf_into(exam, data, replace=replace)
+            except PdfImportError:
+                if replace:
+                    raise
+                # skaner yoki boshqa ko'rinishdagi PDF: savol faylda qoladi, javob varag'i yetarli
+                create_answer_sheet(exam)
+                note = ("PDF dan savollar ajratilmadi, 45 savollik javob varag'i yaratildi. "
+                        "O'quvchi savolni fayldan o'qiydi.")
+            else:
+                note = (f"{created} ta savol kesib olindi, {keyed} tasiga kalit topildi. "
+                        "Qolgan javoblarni kiriting.")
+        data = clean
+    elif replace or not has_questions:
+        if replace:
+            for question in exam.questions.all():
+                question.image.delete(save=False)
+            exam.questions.all().delete()
+        create_answer_sheet(exam)
+        note = "Word fayl saqlandi va 45 savollik javob varag'i yaratildi. Javoblar kalitini kiriting."
+    if exam.attachment:
+        exam.attachment.delete(save=False)
+    exam.attachment.save(f'test.{extension}', ContentFile(data), save=True)
+    return note
+
+
+def discard_exam(exam):
+    for question in exam.questions.all():
+        question.image.delete(save=False)
+    exam.attachment.delete(save=False)
+    exam.delete()

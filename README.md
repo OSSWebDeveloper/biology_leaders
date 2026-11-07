@@ -40,6 +40,19 @@ hosil qilgach: `runbot --webhookni-ochir`.
 
 Web App tugmasi faqat `WEBAPP_URL=https://...` yozilganda paydo bo'ladi: Telegram http ni qabul qilmaydi.
 
+O'qituvchi boti (`TEACHER_BOT_TOKEN`), alohida oynada:
+
+```bash
+.venv/Scripts/python manage.py runteacherbot
+```
+
+## O'quvchi testga qanday kiradi
+
+O'quvchida testlar ro'yxati yo'q: kirish faqat kod bilan. O'qituvchi botiga fayl yuboriladi, nom, vaqt va
+javoblar qatorlar bilan yoziladi; bot fayl, kirish kodi, boshlanish va tugash vaqti yozilgan tayyor xabarni
+qaytaradi, o'qituvchi uni guruhga uzatadi. O'qituvchi botiga faqat `teacher` yoki `admin` roli kira oladi:
+`manage.py rol <telegram_id> teacher`.
+
 ## Foydali buyruqlar
 
 | Buyruq | Vazifasi |

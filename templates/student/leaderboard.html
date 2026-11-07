@@ -10,5 +10,5 @@
   {% empty %}<tr><td class="empty-state">Hali natija yo'q.</td></tr>{% endfor %}
   </table>
 </div>
-<a class="btn ghost block" href="{% url 'exam_detail' exam.pk %}">Orqaga</a>
+<a class="btn ghost block" href="{% url 'exam_detail' exam.access_code %}">Orqaga</a>
 {% endblock %}

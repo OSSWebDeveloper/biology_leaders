@@ -5,8 +5,13 @@ import threading
 import time
 import urllib.error
 import urllib.request
+import uuid
+from pathlib import PurePath
 
 from django.conf import settings
+from django.core.exceptions import SuspiciousFileOperation
+from django.utils import timezone
+from django.utils.text import get_valid_filename
 
 log = logging.getLogger(__name__)
 
@@ -49,23 +54,57 @@ def attempt_result(attempt):
     if not student.telegram_id:
         return
     grade = attempt.grade or 'darajasiz'
-    text = (f"✅ <b>{_esc(attempt.exam.title)}</b> yakunlandi\n\n"
+    text = (f"✅ <b>{esc(attempt.exam.title)}</b> yakunlandi\n\n"
             f"To'g'ri: <b>{attempt.correct_items}</b> / {attempt.total_items}\n"
             f"Taxminiy ball: <b>{attempt.score}</b> / 75\n"
             f"Daraja: <b>{grade}</b>")
     _background([(student.telegram_id, text, _open_button(f'/urinish/{attempt.pk}/natija/', "📊 Tahlilni ko'rish"))])
 
 
-def exam_published(exam):
-    students = {}
-    for group in exam.groups.prefetch_related('students'):
-        for student in group.students.all():
-            if student.telegram_id:
-                students[student.telegram_id] = student
-    text = f"🆕 Yangi test: <b>{_esc(exam.title)}</b>\nVaqt: {exam.duration_min} daqiqa"
-    markup = _open_button(f'/test/{exam.pk}/', '📝 Testni ochish')
-    _background([(tg_id, text, markup) for tg_id in students])
+def announcement_caption(exam):
+    bot = f'@{settings.BOT_USERNAME}' if settings.BOT_USERNAME else 'botga kiring'
+    return (f"📝 <b>{esc(exam.title)}</b>\n\n"
+            f"🔑 Kirish kodi: <code>{exam.access_code}</code>\n"
+            f"🕘 Boshlanish: {timezone.localtime(exam.opens_at):%d.%m.%Y %H:%M}\n"
+            f"🏁 Tugash: {timezone.localtime(exam.closes_at):%d.%m.%Y %H:%M}\n"
+            f"⏱ Vaqt: {exam.duration_min} daqiqa\n\n"
+            f"Testni yechish: {bot} → «Testlar» → kirish kodini yozing.")
 
 
-def _esc(text):
+def announcement_filename(exam):
+    extension = PurePath(exam.attachment.name).suffix
+    try:
+        return get_valid_filename(exam.title) + extension
+    except SuspiciousFileOperation:  # nomi faqat belgilardan iborat
+        return 'test' + extension
+
+
+def exam_announcement(exam, chat_id):
+    """Guruhga uzatiladigan xabar: fayl + kod + vaqtlar. Natijani o'qituvchiga aytish uchun sinxron."""
+    with exam.attachment.open('rb') as source:
+        return _send_document(chat_id, source.read(), announcement_filename(exam), announcement_caption(exam))
+
+
+def _send_document(chat_id, data, filename, caption):
+    boundary = uuid.uuid4().hex
+    parts = []
+    for name, value in (('chat_id', str(chat_id)), ('caption', caption), ('parse_mode', 'HTML')):
+        parts.append(f'--{boundary}\r\nContent-Disposition: form-data; name="{name}"\r\n\r\n{value}\r\n'.encode())
+    parts.append(f'--{boundary}\r\nContent-Disposition: form-data; name="document"; filename="{filename}"\r\n'
+                 'Content-Type: application/octet-stream\r\n\r\n'.encode())
+    parts += [data, f'\r\n--{boundary}--\r\n'.encode()]
+    request = urllib.request.Request(
+        f'https://api.telegram.org/bot{settings.BOT_TOKEN}/sendDocument', data=b''.join(parts),
+        headers={'Content-Type': f'multipart/form-data; boundary={boundary}'},
+    )
+    try:
+        urllib.request.urlopen(request, timeout=120).read()
+    except (urllib.error.URLError, OSError) as exc:
+        # Xatoda URL (token bor) logga tushmasligi uchun faqat turi yoziladi
+        log.warning('Test fayli yuborilmadi: %s', type(exc).__name__)
+        return False
+    return True
+
+
+def esc(text):
     return str(text).replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')

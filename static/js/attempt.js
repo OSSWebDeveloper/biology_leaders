@@ -108,6 +108,7 @@
     html += '<div class="card qcard">';
     if (q.text) html += `<div class="qtext">${esc(q.text)}</div>`;
     if (q.image) html += `<div class="qscroll"><img class="qimg" src="${q.image}" alt="${q.number}-savol sharti" style="width:${scale}%"></div>`;
+    if (!q.text && !q.image) html += '<p class="muted mb0">Savol guruhga yuborilgan faylda.</p>';
     html += '</div>';
 
     if (q.kind === 'open') {

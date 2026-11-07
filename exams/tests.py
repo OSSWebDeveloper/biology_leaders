@@ -5,6 +5,7 @@ import shutil
 import tempfile
 import time
 from datetime import timedelta
+from unittest.mock import patch
 from urllib.parse import urlencode
 
 from django.test import Client, TestCase, override_settings
@@ -36,6 +37,7 @@ def make_user(tg_id, role=User.Role.STUDENT):
 
 
 def make_exam(owner=None, public=True, status=Exam.Status.PUBLISHED, **extra):
+    extra.setdefault('max_attempts', 0)
     exam = Exam.objects.create(title='T', created_by=owner, is_public=public, status=status, **extra)
     Question.objects.create(exam=exam, number=1, kind='mcq', text='q1', correct='B')
     Question.objects.create(exam=exam, number=2, kind='matching', text='q2', correct='F')
@@ -122,7 +124,7 @@ class FlowTests(TestCase):
         self.q1, self.q2, self.q3 = self.exam.questions.all()
 
     def _start(self):
-        response = self.client.post(reverse('attempt_start', args=[self.exam.pk]))
+        response = self.client.post(reverse('attempt_start', args=[self.exam.access_code]))
         self.assertEqual(response.status_code, 302)
         return Attempt.objects.get(student=self.student, finished_at__isnull=True)
 
@@ -157,7 +159,7 @@ class FlowTests(TestCase):
 
     def test_restart_resumes_same_attempt(self):
         first = self._start()
-        self.client.post(reverse('attempt_start', args=[self.exam.pk]))
+        self.client.post(reverse('attempt_start', args=[self.exam.access_code]))
         self.assertEqual(Attempt.objects.filter(student=self.student).count(), 1)
         self.assertEqual(Attempt.objects.get(student=self.student).pk, first.pk)
 
@@ -180,7 +182,7 @@ class FlowTests(TestCase):
         Exam.objects.filter(pk=self.exam.pk).update(max_attempts=1)
         attempt = self._start()
         self.client.post(reverse('attempt_finish', args=[attempt.pk]))
-        self.client.post(reverse('attempt_start', args=[self.exam.pk]))
+        self.client.post(reverse('attempt_start', args=[self.exam.access_code]))
         self.assertEqual(Attempt.objects.filter(student=self.student).count(), 1)
 
     def test_other_student_cannot_touch_attempt(self):
@@ -191,20 +193,49 @@ class FlowTests(TestCase):
         self.assertEqual(self._answer(attempt, question=self.q1.pk, choice='B').status_code, 403)
         self.assertEqual(self.client.post(reverse('attempt_finish', args=[attempt.pk])).status_code, 403)
 
-    def test_visibility(self):
+    def test_exam_is_reachable_only_by_code(self):
+        page = self.client.get(reverse('exam_list'))
+        self.assertNotContains(page, self.exam.title + '<')
+        self.assertNotContains(page, self.exam.access_code)
+        wrong = self.client.post(reverse('exam_list'), {'code': 'YOQ123'}, follow=True)
+        self.assertContains(wrong, 'kod topilmadi')
+        # kichik harf va bo'sh joy bilan yozsa ham topiladi
+        response = self.client.post(reverse('exam_list'), {'code': f' {self.exam.access_code.lower()} '})
+        self.assertRedirects(response, reverse('exam_detail', args=[self.exam.access_code]))
+        self.assertEqual(self.client.get(f'/test/{self.exam.pk}/').status_code, 404)
+
+    def test_draft_code_does_not_work(self):
         draft = make_exam(status=Exam.Status.DRAFT)
-        private = make_exam(public=False)
-        self.assertEqual(self.client.get(reverse('exam_detail', args=[draft.pk])).status_code, 404)
-        self.assertEqual(self.client.get(reverse('exam_detail', args=[private.pk])).status_code, 404)
-        self.assertEqual(self.client.post(reverse('attempt_start', args=[private.pk])).status_code, 404)
-        group = StudyGroup.objects.create(name='G', teacher=make_user(20, 'teacher'))
-        private.groups.add(group)
-        self.client.post(reverse('join_group'), {'code': group.code.lower()})
-        self.assertEqual(self.client.get(reverse('exam_detail', args=[private.pk])).status_code, 200)
+        self.assertEqual(self.client.get(reverse('exam_detail', args=[draft.access_code])).status_code, 404)
+        self.assertEqual(self.client.post(reverse('attempt_start', args=[draft.access_code])).status_code, 404)
+        self.client.post(reverse('exam_list'), {'code': draft.access_code})
+        self.assertFalse(Attempt.objects.exists())
+
+    def test_cannot_start_before_opening(self):
+        Exam.objects.filter(pk=self.exam.pk).update(opens_at=timezone.now() + timedelta(hours=1))
+        page = self.client.get(reverse('exam_detail', args=[self.exam.access_code]))
+        self.assertContains(page, 'da boshlanadi')
+        self.client.post(reverse('attempt_start', args=[self.exam.access_code]))
+        self.assertFalse(Attempt.objects.exists())
+
+    def test_answers_hidden_until_exam_closes(self):
+        Exam.objects.filter(pk=self.exam.pk).update(closes_at=timezone.now() + timedelta(hours=1), show_answers=True)
+        attempt = self._start()
+        self.client.post(reverse('attempt_finish', args=[attempt.pk]))
+        page = self.client.get(reverse('attempt_result', args=[attempt.pk]))
+        self.assertFalse(page.context['show_answers'])
+        self.assertContains(page, 'test tugagach')
+        Exam.objects.filter(pk=self.exam.pk).update(closes_at=timezone.now() - timedelta(minutes=1))
+        self.assertTrue(self.client.get(reverse('attempt_result', args=[attempt.pk])).context['show_answers'])
+
+    def test_leaderboard_needs_attempt(self):
+        self.assertEqual(self.client.get(reverse('leaderboard', args=[self.exam.pk])).status_code, 404)
+        self._start()
+        self.assertEqual(self.client.get(reverse('leaderboard', args=[self.exam.pk])).status_code, 200)
 
     def test_closed_window(self):
         Exam.objects.filter(pk=self.exam.pk).update(closes_at=timezone.now() - timedelta(minutes=1))
-        self.client.post(reverse('attempt_start', args=[self.exam.pk]))
+        self.client.post(reverse('attempt_start', args=[self.exam.access_code]))
         self.assertFalse(Attempt.objects.filter(student=self.student).exists())
 
     def test_deadline_capped_by_close_time(self):
@@ -248,23 +279,31 @@ class RoleTests(TestCase):
         self.assertEqual(self.client.post(reverse('t_publish', args=[self.exam.pk])).status_code, 403)
         self.assertEqual(self.client.get(reverse('a_users')).status_code, 403)
 
-    def test_teacher_cannot_make_public_or_use_foreign_group(self):
-        foreign = StudyGroup.objects.create(name='F', teacher=self.other)
+    def _settings(self, **extra):
+        return {'title': 'T', 'subject': 'M', 'duration_min': 10, 'max_attempts': 1, 'weight_mcq': 1,
+                'weight_matching': 1, 'weight_open': 1, 'opens_at': '2030-01-01T09:00',
+                'closes_at': '2030-01-01T12:00', **extra}
+
+    def test_exam_form_requires_start_and_end(self):
         self.client.force_login(self.teacher)
-        self.client.post(reverse('t_exam_edit', args=[self.exam.pk]), {
-            'title': 'T', 'subject': 'M', 'duration_min': 10, 'max_attempts': 0, 'is_public': 'on',
-            'weight_mcq': 1, 'weight_matching': 1, 'weight_open': 1, 'groups': [foreign.pk]})
+        url = reverse('t_exam_edit', args=[self.exam.pk])
+        missing = self._settings()
+        del missing['closes_at']
+        self.assertEqual(self.client.post(url, missing).status_code, 200)
+        reversed_times = self._settings(closes_at='2029-01-01T09:00')
+        self.assertEqual(self.client.post(url, reversed_times).status_code, 200)
+        self.assertEqual(self.client.post(url, self._settings(is_public='on')).status_code, 302)
         self.exam.refresh_from_db()
+        self.assertIsNotNone(self.exam.closes_at)
         self.assertFalse(self.exam.is_public)
-        self.assertFalse(self.exam.groups.exists())
 
     def test_publish_rules(self):
         self.client.force_login(self.teacher)
-        self.client.post(reverse('t_publish', args=[self.exam.pk]))  # guruh yo'q
+        self.client.post(reverse('t_publish', args=[self.exam.pk]))  # vaqt yo'q
         self.exam.refresh_from_db()
         self.assertFalse(self.exam.is_published)
-        group = StudyGroup.objects.create(name='G', teacher=self.teacher)
-        self.exam.groups.add(group)
+        Exam.objects.filter(pk=self.exam.pk).update(opens_at=timezone.now(),
+                                                    closes_at=timezone.now() + timedelta(hours=1))
         Question.objects.filter(exam=self.exam, number=1).update(correct='')
         self.client.post(reverse('t_publish', args=[self.exam.pk]))  # kalit yo'q
         self.exam.refresh_from_db()
@@ -322,6 +361,71 @@ class PdfUploadViewTests(TestCase):
             self.assertEqual(self.client.get(reverse('t_exam', args=[exam.pk])).status_code, 200)
             bad = SimpleUploadedFile('t.pdf', b'emas', content_type='application/pdf')
             self.assertEqual(self.client.post(reverse('t_pdf', args=[exam.pk]), {'pdf': bad}).status_code, 200)
+            # guruhga ketadigan nusxada kalit qolmasligi kerak
+            exam.refresh_from_db()
+            with exam.attachment.open('rb') as saved:
+                clean = pymupdf.open(stream=saved.read(), filetype='pdf')
+            text = ''.join(page.get_text() for page in clean)
+            self.assertIn('1. Savol', text)
+            self.assertNotIn('JAVOBLAR', text)
+
+    def _teacher_exam(self, media):
+        self.addCleanup(shutil.rmtree, media, ignore_errors=True)
+        teacher = make_user(51, 'teacher')
+        self.client.force_login(teacher)
+        return teacher, Exam.objects.create(title='Matematika 1', created_by=teacher,
+                                            opens_at=timezone.now(), closes_at=timezone.now() + timedelta(hours=2))
+
+    def test_word_upload_creates_answer_sheet_and_student_can_answer(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        media = tempfile.mkdtemp()
+        _, exam = self._teacher_exam(media)
+        with override_settings(MEDIA_ROOT=media):
+            fake = SimpleUploadedFile('t.docx', b'emas', content_type='application/octet-stream')
+            self.assertEqual(self.client.post(reverse('t_pdf', args=[exam.pk]), {'pdf': fake}).status_code, 200)
+            word = SimpleUploadedFile('t.docx', b'PK\x03\x04word', content_type='application/octet-stream')
+            self.assertEqual(self.client.post(reverse('t_pdf', args=[exam.pk]), {'pdf': word}).status_code, 302)
+            exam.refresh_from_db()
+            self.assertTrue(exam.attachment.name.endswith('.docx'))
+            kinds = [exam.questions.filter(kind=k).count() for k in ('mcq', 'matching', 'open')]
+            self.assertEqual(kinds, [32, 3, 10])
+            self.assertEqual(self.client.get(reverse('t_exam', args=[exam.pk])).status_code, 200)
+            exam.status = Exam.Status.PUBLISHED
+            exam.save(update_fields=['status'])
+            self.client.force_login(make_user(52))
+            response = self.client.post(reverse('attempt_start', args=[exam.access_code]), follow=True)
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(len(response.context['payload']['questions']), 45)
+
+    def test_second_upload_keeps_questions(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        media = tempfile.mkdtemp()
+        _, exam = self._teacher_exam(media)
+        Question.objects.create(exam=exam, number=1, text='q', correct='A')
+        with override_settings(MEDIA_ROOT=media):
+            word = SimpleUploadedFile('t.doc', b'\xd0\xcf\x11\xe0word', content_type='application/octet-stream')
+            self.client.post(reverse('t_pdf', args=[exam.pk]), {'pdf': word})
+        self.assertEqual(exam.questions.count(), 1)
+
+    def test_send_announcement_to_teacher(self):
+        from django.core.files.base import ContentFile
+        media = tempfile.mkdtemp()
+        _, exam = self._teacher_exam(media)
+        url = reverse('t_send', args=[exam.pk])
+        with override_settings(MEDIA_ROOT=media), patch('tgbot.notify._send_document', return_value=True) as send:
+            self.assertContains(self.client.post(url, follow=True), 'Avval testni')
+            exam.status = Exam.Status.PUBLISHED
+            exam.save(update_fields=['status'])
+            self.assertContains(self.client.post(url, follow=True), 'faylini')
+            send.assert_not_called()
+            exam.attachment.save('t.pdf', ContentFile(b'%PDF'), save=True)
+            self.assertContains(self.client.post(url, follow=True), 'guruhga uzating')
+            chat_id, data, filename, caption = send.call_args.args
+            self.assertEqual((chat_id, data, filename), (51, b'%PDF', 'Matematika_1.pdf'))
+            self.assertIn(exam.access_code, caption)
+            self.assertIn(timezone.localtime(exam.closes_at).strftime('%d.%m.%Y %H:%M'), caption)
+            send.return_value = False
+            self.assertContains(self.client.post(url, follow=True), 'yuborilmadi')
 
 
 class PdfImportTests(TestCase):

@@ -1,14 +1,14 @@
 {% extends "base.html" %}
 {% block title %}O'qituvchi paneli{% endblock %}
 {% block content %}
-<div class="row between"><h1>Testlarim</h1><a class="btn ghost sm" href="{% url 't_groups' %}">👥 Guruhlar</a></div>
+<h1>Testlarim</h1>
 <a class="btn block" href="{% url 't_exam_new' %}">+ Yangi test</a>
 <div class="mt">
 {% for e in exams %}
 <a class="card link" href="{% url 't_exam' e.pk %}">
   <div class="row between">
     <div class="grow"><div class="title">{{ e.title }}</div>
-    <div class="muted small">{{ e.q_count }} savol · {{ e.done_count }} ta yechilgan{% if user.is_admin_role and e.created_by %} · {{ e.created_by }}{% endif %}</div></div>
+    <div class="muted small">Kod: {{ e.access_code }} · {{ e.q_count }} savol · {{ e.done_count }} ta yechilgan{% if user.is_admin_role and e.created_by %} · {{ e.created_by }}{% endif %}</div></div>
     {% if e.is_published %}<span class="tag ok">E'lon qilingan</span>{% else %}<span class="tag plain">Qoralama</span>{% endif %}
   </div>
 </a>

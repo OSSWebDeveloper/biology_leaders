@@ -1,5 +1,14 @@
 # Versiyalar tarixi
 
+## 1.1.0 — 2026-11-07
+
+Testga faqat kod bilan kirish va o'qituvchi boti
+
+- O'quvchida testlar ro'yxati yo'q, kirish kodi orqali kiradi
+- O'qituvchi boti: fayl, vaqt va kalit qatorlar bilan, guruhga uzatish uchun tayyor xabar
+- PDF kalit sahifasi guruh nusxasidan o'chiriladi, Word uchun javob varag'i
+- To'g'ri javoblar test tugagach ko'rinadi, yangi testda urinish 1 ta
+
 ## 1.0.2 — 2026-11-07
 
 Web App'dan kirish tuzatildi

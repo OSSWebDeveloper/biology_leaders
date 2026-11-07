@@ -17,7 +17,7 @@ from tgbot import notify
 from .forms import ExamForm, PdfImportForm, QuestionForm
 from .models import Answer, Attempt, Exam, Question
 from .pdf_import import PdfImportError
-from .services import import_pdf_into, regrade_exam
+from .services import attach_test_file, discard_exam, regrade_exam
 
 
 def _exam_or_403(request, pk):
@@ -48,12 +48,11 @@ def t_exams(request):
 
 @teacher_required
 def t_exam_new(request):
-    form = ExamForm(request.POST or None, user=request.user)
+    form = ExamForm(request.POST or None)
     if request.method == 'POST' and form.is_valid():
         exam = form.save(commit=False)
         exam.created_by = request.user
         exam.save()
-        form.save_m2m()
         return redirect('t_pdf', pk=exam.pk)
     return render(request, 'teacher/form.html', {'form': form, 'title': 'Yangi test', 'tab': 'teacher',
                                                  'back': 't_exams'})
@@ -62,7 +61,7 @@ def t_exam_new(request):
 @teacher_required
 def t_exam_edit(request, pk):
     exam = _exam_or_403(request, pk)
-    form = ExamForm(request.POST or None, instance=exam, user=request.user)
+    form = ExamForm(request.POST or None, instance=exam)
     if request.method == 'POST' and form.is_valid():
         form.save()
         if exam.attempts.filter(finished_at__isnull=False).exists():
@@ -107,12 +106,11 @@ def t_pdf(request, pk):
             messages.error(request, "Testni yechganlar bor: savollarni almashtirib bo'lmaydi")
             return redirect('t_exam', pk=pk)
         try:
-            created, keyed = import_pdf_into(exam, form.cleaned_data['pdf'].read(), replace=replace)
+            note = attach_test_file(exam, form.cleaned_data['pdf'], replace=replace)
         except PdfImportError as exc:
             messages.error(request, str(exc))
         else:
-            messages.success(request, f"{created} ta savol kesib olindi, {keyed} tasiga kalit topildi. "
-                                      "Rasmlarni tekshirib, qolgan javoblarni kiriting.")
+            messages.success(request, note)
             return redirect('t_exam', pk=pk)
     return render(request, 'teacher/pdf.html', {'form': form, 'exam': exam, 'tab': 'teacher'})
 
@@ -161,14 +159,32 @@ def t_publish(request, pk):
         messages.error(request, "Testda savol yo'q")
     elif missing:
         messages.error(request, "Kalit to'ldirilmagan savollar: " + ', '.join(map(str, missing)))
-    elif not exam.is_public and not exam.groups.exists():
-        messages.error(request, "Avval sozlamalarda guruh tanlang" +
-                       (" yoki testni hammaga oching" if request.user.is_admin_role else ""))
+    elif not exam.opens_at or not exam.closes_at:
+        messages.error(request, "Avval sozlamalarda boshlanish va tugash vaqtini kiriting")
     else:
         exam.status = Exam.Status.PUBLISHED
         exam.save(update_fields=['status'])
-        notify.exam_published(exam)
-        messages.success(request, "Test e'lon qilindi")
+        messages.success(request, "Test e'lon qilindi. Endi xabarni botga yuborib, guruhga uzating.")
+    return redirect('t_exam', pk=pk)
+
+
+@teacher_required
+@require_POST
+def t_send(request, pk):
+    """Fayl, kod va vaqtlardan iborat tayyor xabar o'qituvchiga keladi, u guruhga uzatadi."""
+    exam = _exam_or_403(request, pk)
+    if not exam.is_published:
+        messages.error(request, "Avval testni e'lon qiling")
+    elif not exam.attachment:
+        messages.error(request, 'Avval test faylini (PDF yoki Word) yuklang')
+    elif not exam.opens_at or not exam.closes_at:
+        messages.error(request, 'Avval boshlanish va tugash vaqtini kiriting')
+    elif not request.user.telegram_id:
+        messages.error(request, "Hisobingiz Telegram bilan bog'lanmagan")
+    elif notify.exam_announcement(exam, request.user.telegram_id):
+        messages.success(request, 'Xabar botga yuborildi. Uni guruhga uzating.')
+    else:
+        messages.error(request, "Xabar yuborilmadi. Botga /start bosganingizni va internetni tekshiring.")
     return redirect('t_exam', pk=pk)
 
 
@@ -179,9 +195,7 @@ def t_exam_delete(request, pk):
     if exam.attempts.exists():
         messages.error(request, "Testni yechganlar bor: o'chirib bo'lmaydi. E'londan olishingiz mumkin.")
         return redirect('t_exam', pk=pk)
-    for question in exam.questions.all():
-        question.image.delete(save=False)
-    exam.delete()
+    discard_exam(exam)
     messages.success(request, "Test o'chirildi")
     return redirect('t_exams')
 

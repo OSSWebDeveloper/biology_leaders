@@ -1,7 +1,26 @@
+import secrets
+import uuid
+from pathlib import PurePath
+
 from django.conf import settings
 from django.db import models
 from django.db.models import Q
 from django.utils import timezone
+
+CODE_ALPHABET = '23456789ABCDEFGHJKMNPQRSTUVWXYZ'  # 0/O, 1/I/L adashmasligi uchun
+CODE_LENGTH = 6
+
+
+def generate_access_code():
+    while True:
+        code = ''.join(secrets.choice(CODE_ALPHABET) for _ in range(CODE_LENGTH))
+        if not Exam.objects.filter(access_code=code).exists():
+            return code
+
+
+def attachment_path(instance, filename):
+    # Media ochiq xizmat qilinadi: manzilni taxmin qilib bo'lmasligi kerak
+    return f'exam_files/{uuid.uuid4().hex}{PurePath(filename).suffix.lower()}'
 
 
 class Exam(models.Model):
@@ -22,7 +41,10 @@ class Exam(models.Model):
                                     verbose_name='Guruhlar')
     opens_at = models.DateTimeField("Ochilish vaqti", null=True, blank=True)
     closes_at = models.DateTimeField("Yopilish vaqti", null=True, blank=True)
-    max_attempts = models.PositiveIntegerField("Urinishlar soni", default=0, help_text='0 — cheklanmagan')
+    max_attempts = models.PositiveIntegerField("Urinishlar soni", default=1, help_text='0 — cheklanmagan')
+    access_code = models.CharField("Kirish kodi", max_length=8, unique=True, editable=False,
+                                   default=generate_access_code)
+    attachment = models.FileField("Test fayli", upload_to=attachment_path, blank=True)
     show_answers = models.BooleanField("Tugagach to'g'ri javoblar ko'rinsin", default=True)
     weight_mcq = models.FloatField("Yopiq test vazni (1–32)", default=1)
     weight_matching = models.FloatField("Moslashtirish vazni (33–35)", default=1)

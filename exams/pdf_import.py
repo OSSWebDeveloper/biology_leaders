@@ -242,6 +242,33 @@ def slice_pdf(data):
     return ImportResult(slices, key)
 
 
+def strip_key_pages(data):
+    """Guruhga yuboriladigan nusxa: «JAVOBLAR» sarlavhasidan keyingi hamma narsa o'chiriladi."""
+    try:
+        doc = fitz.open(stream=data, filetype='pdf')
+    except Exception as exc:
+        raise PdfImportError("PDF faylni ochib bo'lmadi") from exc
+    if doc.is_encrypted:
+        raise PdfImportError('PDF parol bilan himoyalangan')
+    for page in doc:
+        lines = _page_lines(page)
+        key_line = next((l for l in lines if _KEY_PAGE.match(l.text)), None)
+        if key_line is None:
+            continue
+        number = page.number
+        before = [l for l in lines if l.y1 <= key_line.y0 and not l.text.isdigit()]
+        if before:  # sahifa boshida oxirgi savol bor: faqat jadval qismi o'chiriladi
+            page.add_redact_annot(fitz.Rect(0, key_line.y0 - 2, page.rect.width, page.rect.height), fill=(1, 1, 1))
+            page.apply_redactions()
+            number += 1
+        if number < len(doc):
+            doc.delete_pages(range(number, len(doc)))
+        break
+    clean = doc.tobytes(garbage=3, deflate=True)
+    doc.close()
+    return clean
+
+
 def _in_segments(line, segments):
     return any(line.page == s[0] and s[3] - 1 <= line.y0 < s[4] for s in segments)
 

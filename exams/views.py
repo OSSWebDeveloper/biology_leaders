@@ -6,14 +6,13 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_POST
 
-from accounts.models import StudyGroup
-
-from .models import Attempt, Question
+from .models import Attempt, Exam, Question
 from .scoring import GRADES
-from .services import can_start, finalize, save_answer, start_attempt, visible_exams
+from .services import can_start, exam_by_code, finalize, save_answer, start_attempt
 
 
 @ensure_csrf_cookie  # landing dagi JS tg_auth ga token yuboradi, sahifada forma yo'q
@@ -23,8 +22,8 @@ def home(request):
     return redirect('exam_list')
 
 
-def _exam_for_student(request, pk):
-    exam = visible_exams(request.user).filter(pk=pk).first()
+def _exam_for_code(code):
+    exam = exam_by_code(code)
     if exam is None:
         raise Http404
     return exam
@@ -41,26 +40,21 @@ def _own_attempt(request, pk):
 
 @login_required
 def exam_list(request):
-    exams = list(visible_exams(request.user).prefetch_related('questions'))
-    finished = {}
-    active = {}
-    for attempt in Attempt.objects.filter(student=request.user).order_by('started_at'):
-        if attempt.finished_at:
-            best = finished.get(attempt.exam_id)
-            if best is None or attempt.score > best.score:
-                finished[attempt.exam_id] = attempt
-        elif attempt.seconds_left() > 0:
-            active[attempt.exam_id] = attempt
-    rows = [{'exam': e, 'best': finished.get(e.pk), 'active': active.get(e.pk),
-             'count': len(e.questions.all())} for e in exams]
-    return render(request, 'student/exam_list.html', {
-        'rows': rows, 'groups': request.user.study_groups.select_related('teacher'), 'tab': 'tests',
-    })
+    """O'quvchi bosh sahifasi: testlar ro'yxati yo'q, kirish faqat guruhdagi kod bilan."""
+    if request.method == 'POST':
+        exam = exam_by_code(request.POST.get('code'))
+        if exam:
+            return redirect('exam_detail', code=exam.access_code)
+        messages.error(request, "Bunday kod topilmadi. Guruhdagi xabarni tekshiring.")
+        return redirect('exam_list')
+    active = [a for a in Attempt.objects.filter(student=request.user, finished_at__isnull=True).select_related('exam')
+              if a.seconds_left() > 0]
+    return render(request, 'student/exam_list.html', {'active': active, 'tab': 'tests'})
 
 
 @login_required
-def exam_detail(request, pk):
-    exam = _exam_for_student(request, pk)
+def exam_detail(request, code):
+    exam = _exam_for_code(code)
     attempts = exam.attempts.filter(student=request.user, finished_at__isnull=False)
     active = exam.attempts.filter(student=request.user, finished_at__isnull=True).first()
     if active and active.seconds_left() <= 0:
@@ -76,14 +70,14 @@ def exam_detail(request, pk):
 
 @login_required
 @require_POST
-def attempt_start(request, pk):
-    exam = _exam_for_student(request, pk)
+def attempt_start(request, code):
+    exam = _exam_for_code(code)
     active = exam.attempts.filter(student=request.user, finished_at__isnull=True).first()
     if not active or active.seconds_left() <= 0:
         allowed, reason = can_start(exam, request.user)
         if not allowed:
             messages.error(request, reason)
-            return redirect('exam_detail', pk=pk)
+            return redirect('exam_detail', code=exam.access_code)
     return redirect('attempt', pk=start_attempt(exam, request.user).pk)
 
 
@@ -151,9 +145,12 @@ def attempt_result(request, pk):
         rows.append({'q': q, 'a': a, 'hits': hits,
                      'state': 'empty' if not a or not a.is_answered else
                               'ok' if hits == q.max_items else 'part' if hits else 'bad'})
+    # Test ochiq turganda javoblar ko'rsatilsa, ular guruhga tarqab ketadi
+    answers_later = exam.show_answers and bool(exam.closes_at) and timezone.now() < exam.closes_at
     return render(request, 'student/result.html', {
         'attempt': attempt, 'exam': exam, 'rows': rows, 'sections': sections.values(),
-        'grades': GRADES, 'show_answers': exam.show_answers, 'tab': 'results',
+        'grades': GRADES, 'show_answers': exam.show_answers and not answers_later,
+        'answers_later': answers_later, 'tab': 'results',
     })
 
 
@@ -166,23 +163,13 @@ def my_results(request):
 
 @login_required
 def leaderboard(request, pk):
-    exam = _exam_for_student(request, pk)
+    exam = get_object_or_404(Exam, pk=pk)
+    is_owner = request.user.is_admin_role or (request.user.is_teacher and exam.created_by_id == request.user.pk)
+    if not is_owner and not exam.attempts.filter(student=request.user).exists():
+        raise Http404
     best = {}
     for attempt in (exam.attempts.filter(finished_at__isnull=False).select_related('student')
                     .order_by('-score', 'finished_at')):
         best.setdefault(attempt.student_id, attempt)
     rows = list(best.values())[:100]
     return render(request, 'student/leaderboard.html', {'exam': exam, 'rows': rows, 'tab': 'tests'})
-
-
-@login_required
-@require_POST
-def join_group(request):
-    code = request.POST.get('code', '').strip()
-    group = StudyGroup.objects.filter(code__iexact=code).first() if code else None
-    if group:
-        group.students.add(request.user)
-        messages.success(request, f"«{group.name}» guruhiga qo'shildingiz")
-    else:
-        messages.error(request, 'Bunday kodli guruh topilmadi')
-    return redirect('exam_list')
