@@ -1,0 +1,34 @@
+{% extends "base.html" %}{% load static %}
+{% block title %}{{ attempt.exam.title }}{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+{% endblock %}
+{% block body %}
+<div id="exam" data-attempt="{{ attempt.pk }}" data-save-url="{% url 'attempt_answer' attempt.pk %}" data-result-url="{% url 'attempt_result' attempt.pk %}">
+  <header class="exam-top">
+    <span class="timer" id="timer" role="timer">--:--</span>
+    <span class="save-state" id="save-state" aria-live="polite"></span>
+    <span class="muted small" id="progress"></span>
+  </header>
+  <main class="exam-body" id="q-body"></main>
+  <footer class="exam-bottom">
+    <button class="btn ghost grid-btn" id="grid-btn" type="button" aria-label="Savollar ro'yxati">▦</button>
+    <button class="btn ghost" id="prev" type="button">← Oldingi</button>
+    <button class="btn" id="next" type="button">Keyingi →</button>
+  </footer>
+  <div class="sheet" id="sheet">
+    <div class="sheet-box" role="dialog" aria-label="Savollar">
+      <h2>Savollar</h2>
+      <div class="num-grid" id="num-grid"></div>
+      <p class="muted small" id="sheet-summary"></p>
+      <button class="btn block" id="finish-btn" type="button">Testni yakunlash</button>
+    </div>
+  </div>
+  <div class="zoom" id="zoom"><button id="zoom-close" type="button" aria-label="Yopish">✕</button><img id="zoom-img" alt=""></div>
+  <form method="post" action="{% url 'attempt_finish' attempt.pk %}" id="finish-form">{% csrf_token %}</form>
+</div>
+{{ payload|json_script:"exam-data" }}
+{% endblock %}
+{% block scripts %}<script src="{% static 'js/attempt.js' %}"></script>{% endblock %}

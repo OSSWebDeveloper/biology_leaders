@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Reyting{% endblock %}
+{% block content %}
+<h1>🏆 Reyting</h1>
+<p class="muted">{{ exam.title }}</p>
+<div class="card">
+  <table class="t">
+  {% for a in rows %}
+    <tr {% if a.student_id == user.pk %}style="font-weight:700"{% endif %}><td>{{ forloop.counter }}</td><td>{{ a.student.display_name }}</td><td class="right">{{ a.score }}</td><td class="right">{{ a.grade|default:"—" }}</td></tr>
+  {% empty %}<tr><td class="empty-state">Hali natija yo'q.</td></tr>{% endfor %}
+  </table>
+</div>
+<a class="btn ghost block" href="{% url 'exam_detail' exam.pk %}">Orqaga</a>
+{% endblock %}

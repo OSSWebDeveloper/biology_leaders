@@ -1,0 +1,10 @@
+{% with q=row.q a=row.a %}
+<div class="answer-line">
+{% if q.kind == 'open' %}
+  <div>a) Javobingiz: <b>{{ a.value_a|default:"—" }}</b>{% if a.value_a %} {% if a.correct_a %}<span class="tag ok">to'g'ri</span>{% else %}<span class="tag bad">xato</span>{% endif %}{% endif %}{% if show %} <span class="muted">· to'g'ri: {{ q.answer_a }}</span>{% endif %}</div>
+  <div>b) Javobingiz: <b>{{ a.value_b|default:"—" }}</b>{% if a.value_b %} {% if a.correct_b %}<span class="tag ok">to'g'ri</span>{% else %}<span class="tag bad">xato</span>{% endif %}{% endif %}{% if show %} <span class="muted">· to'g'ri: {{ q.answer_b }}</span>{% endif %}</div>
+{% else %}
+  Javobingiz: <b>{{ a.choice|default:"—" }}</b>{% if show %} <span class="muted">· to'g'ri: <b>{{ q.correct|default:"—" }}</b></span>{% endif %}
+{% endif %}
+</div>
+{% endwith %}

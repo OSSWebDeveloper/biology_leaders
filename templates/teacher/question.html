@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Savol{% endblock %}
+{% block content %}
+<h1>{% if question.pk %}{{ question.number }}-savolni tahrirlash{% else %}Yangi savol{% endif %}</h1>
+<p class="muted">{{ exam.title }}</p>
+{% if question.image %}<div class="card"><img class="qimg" src="{{ question.image.url }}" alt="Joriy rasm"></div>{% endif %}
+<form method="post" enctype="multipart/form-data" class="card form">{% csrf_token %}
+  {{ form.as_div }}
+  <button class="btn block">Saqlash</button>
+</form>
+{% if question.pk %}
+<form method="post" action="{% url 't_question_delete' exam.pk question.pk %}" data-confirm="Savol o'chirilsinmi?">{% csrf_token %}
+  <button class="btn danger block">Savolni o'chirish</button></form>
+{% endif %}
+<a class="btn ghost block mt" href="{% url 't_exam' exam.pk %}">Orqaga</a>
+{% endblock %}

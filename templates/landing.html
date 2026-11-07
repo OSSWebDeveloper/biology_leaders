@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block body %}
+<div class="center-screen"><div id="box">
+  <div class="spinner" id="spin"></div>
+  <h1 id="ttl">Milliy Sertifikat</h1>
+  <p class="muted" id="txt">{% if link_error %}Havola eskirgan yoki ishlatilgan. Botda /panel buyrug'ini qayta yuboring.{% else %}Kirilmoqda…{% endif %}</p>
+</div></div>
+{% endblock %}
+{% block scripts %}
+<script>
+(function () {
+  const tg = window.Telegram && window.Telegram.WebApp;
+  const spin = document.getElementById('spin'), txt = document.getElementById('txt');
+  const stop = message => { spin.style.display = 'none'; if (message) txt.textContent = message; };
+  {% if link_error %}stop(); return;{% endif %}
+  if (!tg || !tg.initData) {
+    stop("Testlarni yechish uchun ilovani Telegram botidan oching.{% if BOT_USERNAME %} Bot: @{{ BOT_USERNAME }}{% endif %}");
+    return;
+  }
+  fetch("{% url 'tg_auth' %}", {
+    method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken()},
+    body: JSON.stringify({init_data: tg.initData}),
+  }).then(r => r.json().then(d => ({ok: r.ok, d}))).then(({ok, d}) => {
+    if (ok) location.replace("{% url 'exam_list' %}");
+    else stop(d.error || "Kirib bo'lmadi");
+  }).catch(() => stop("Internet bilan aloqa yo'q. Qayta urinib ko'ring."));
+})();
+</script>
+{% endblock %}

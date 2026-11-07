@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Admin{% endblock %}
+{% block content %}
+<div class="row between"><h1>Boshqaruv</h1><a class="btn ghost sm" href="{% url 'a_users' %}">👤 Foydalanuvchilar</a></div>
+<div class="stats">
+  <div class="stat"><b>{{ students }}</b><span>O'quvchi</span></div>
+  <div class="stat"><b>{{ teachers }}</b><span>O'qituvchi</span></div>
+  <div class="stat"><b>{{ admins }}</b><span>Admin</span></div>
+  <div class="stat"><b>{{ groups }}</b><span>Guruh</span></div>
+  <div class="stat"><b>{{ published }} / {{ exams }}</b><span>E'lon qilingan test</span></div>
+  <div class="stat"><b>{{ attempts }}</b><span>Yechilgan</span></div>
+  <div class="stat"><b>{% if average is not None %}{{ average|floatformat:1 }}{% else %}—{% endif %}</b><span>O'rtacha ball</span></div>
+</div>
+<div class="card">
+  <h2>Oxirgi natijalar</h2>
+  <div class="table-wrap"><table class="t">
+    {% for a in recent %}
+    <tr><td>{{ a.student.display_name }}<div class="muted small">{{ a.exam.title }}</div></td><td class="right"><b>{{ a.score }}</b> · {{ a.grade|default:"—" }}<div class="muted small">{{ a.finished_at|date:"d.m H:i" }}</div></td></tr>
+    {% empty %}<tr><td class="empty-state">Hali natija yo'q.</td></tr>{% endfor %}
+  </table></div>
+</div>
+{% endblock %}

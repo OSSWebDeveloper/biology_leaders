@@ -1,0 +1,30 @@
+{% load static %}<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>{% block title %}Milliy Sertifikat{% endblock %}</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link rel="stylesheet" href="{% static 'css/app.css' %}">
+{% block head %}{% endblock %}
+</head>
+<body data-tg-id="{{ user.telegram_id|default_if_none:'' }}">
+{% block body %}
+<main class="wrap {% block wrapclass %}{% endblock %}">
+  {% for m in messages %}<div class="msg {{ m.tags }}">{{ m }}</div>{% endfor %}
+  {% block content %}{% endblock %}
+  <div class="footer">v{{ APP_VERSION }}</div>
+</main>
+{% if user.is_authenticated and not hide_nav %}
+<nav class="tabs">
+  <a href="{% url 'exam_list' %}" class="{% if tab == 'tests' %}on{% endif %}"><b>📝</b>Testlar</a>
+  <a href="{% url 'my_results' %}" class="{% if tab == 'results' %}on{% endif %}"><b>📊</b>Natijalar</a>
+  {% if user.is_teacher %}<a href="{% url 't_exams' %}" class="{% if tab == 'teacher' %}on{% endif %}"><b>🎓</b>O'qituvchi</a>{% endif %}
+  {% if user.is_admin_role %}<a href="{% url 'a_dashboard' %}" class="{% if tab == 'admin' %}on{% endif %}"><b>⚙️</b>Admin</a>{% endif %}
+</nav>
+{% endif %}
+{% endblock %}
+<script src="{% static 'js/app.js' %}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

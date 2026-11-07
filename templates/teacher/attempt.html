@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}{{ attempt.student.display_name }}{% endblock %}
+{% block content %}
+<h1>{{ attempt.student.display_name }}</h1>
+<p class="muted">{{ exam.title }} · {{ attempt.score }} ball · {{ attempt.grade|default:"darajasiz" }} · {{ attempt.correct_items }}/{{ attempt.total_items }}</p>
+<div class="card"><div class="num-grid mb0">{% for r in rows %}<a class="num {{ r.state }}" href="#s{{ r.q.number }}">{{ r.q.number }}</a>{% endfor %}</div></div>
+{% for row in rows %}
+<div class="card review {{ row.state }}" id="s{{ row.q.number }}">
+  <div class="title">{{ row.q.number }}-savol</div>
+  {% if row.q.image %}<img class="qimg" loading="lazy" width="{{ row.q.image.width }}" height="{{ row.q.image.height }}" src="{{ row.q.image.url }}" alt="{{ row.q.number }}-savol sharti">{% endif %}
+  {% include "student/_answer.html" with row=row show=True %}
+</div>
+{% endfor %}
+<a class="btn ghost block" href="{% url 't_results' exam.pk %}">Natijalarga qaytish</a>
+{% endblock %}

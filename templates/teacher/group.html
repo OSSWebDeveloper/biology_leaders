@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}{{ group.name }}{% endblock %}
+{% block content %}
+<h1>{{ group.name }}</h1>
+<div class="card">
+  <h2>Taklif</h2>
+  <p>Kod: <b>{{ group.code }}</b></p>
+  {% if group.invite_link %}<div class="copy">{{ group.invite_link }}</div><p class="muted small mt mb0">Havolani o'quvchilarga yuboring: bosishi bilan guruhga qo'shiladi.</p>{% endif %}
+</div>
+<div class="card">
+  <h2>O'quvchilar ({{ students|length }})</h2>
+  <div class="table-wrap"><table class="t">
+    {% for s in students %}
+    <tr><td>{{ s.display_name }}<div class="muted small">{{ s.phone }}</div></td>
+      <td class="right"><form method="post" action="{% url 't_group_remove' group.pk s.pk %}" data-confirm="Guruhdan chiqarilsinmi?">{% csrf_token %}<button class="btn danger sm">Chiqarish</button></form></td></tr>
+    {% empty %}<tr><td class="empty-state">Hali o'quvchi yo'q.</td></tr>{% endfor %}
+  </table></div>
+</div>
+<div class="card">
+  <h2>Testlar</h2>
+  {% for e in exams %}<p><a href="{% url 't_exam' e.pk %}">{{ e.title }}</a></p>{% empty %}<p class="muted mb0">Test sozlamalarida shu guruhni tanlang.</p>{% endfor %}
+</div>
+<form method="post" action="{% url 't_group_delete' group.pk %}" data-confirm="Guruh o'chirilsinmi?">{% csrf_token %}<button class="btn danger block">Guruhni o'chirish</button></form>
+<a class="btn ghost block mt" href="{% url 't_groups' %}">Orqaga</a>
+{% endblock %}

@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Guruhlar{% endblock %}
+{% block content %}
+<div class="row between"><h1>Guruhlar</h1><a class="btn ghost sm" href="{% url 't_exams' %}">Testlar</a></div>
+<form method="post" class="card row">{% csrf_token %}
+  <input class="grow" name="name" placeholder="Yangi guruh nomi" maxlength="120" aria-label="Guruh nomi">
+  <button class="btn">Yaratish</button>
+</form>
+{% for g in groups %}
+<a class="card link" href="{% url 't_group' g.pk %}"><div class="row between"><div><div class="title">{{ g.name }}</div><div class="muted small">{{ g.n }} o'quvchi · kod: {{ g.code }}</div></div><span class="muted">›</span></div></a>
+{% empty %}<div class="card empty-state">Hali guruh yo'q.</div>{% endfor %}
+{% endblock %}

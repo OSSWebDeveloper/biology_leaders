@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Testlar{% endblock %}
+{% block content %}
+<h1>Testlar</h1>
+{% for r in rows %}
+<a class="card link" href="{% url 'exam_detail' r.exam.pk %}">
+  <div class="row between">
+    <div class="grow">
+      <div class="title">{{ r.exam.title }}</div>
+      <div class="muted small">{{ r.exam.subject }} · {{ r.count }} savol · {{ r.exam.duration_min }} daqiqa</div>
+      {% if r.active %}<span class="tag warn mt">Davom etmoqda</span>{% endif %}
+    </div>
+    {% if r.best %}<div class="right"><span class="grade">{{ r.best.grade|default:"—" }}</span><div class="muted small">{{ r.best.score }} ball</div></div>{% endif %}
+  </div>
+</a>
+{% empty %}
+<div class="card empty-state">Hozircha sizga ochiq test yo'q. O'qituvchi bergan kod bilan guruhga qo'shiling.</div>
+{% endfor %}
+<div class="card">
+  <h2>Guruhga qo'shilish</h2>
+  {% for g in groups %}<span class="tag plain">{{ g.name }}</span> {% endfor %}
+  <form method="post" action="{% url 'join_group' %}" class="row mt">{% csrf_token %}
+    <input class="grow" name="code" placeholder="Taklif kodi" maxlength="12" aria-label="Taklif kodi" autocapitalize="characters" autocomplete="off">
+    <button class="btn ghost">Qo'shilish</button>
+  </form>
+</div>
+{% endblock %}

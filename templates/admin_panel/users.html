@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Foydalanuvchilar{% endblock %}
+{% block content %}
+<div class="row between"><h1>Foydalanuvchilar</h1><a class="btn ghost sm" href="{% url 'a_dashboard' %}">Boshqaruv</a></div>
+<form method="get" class="card row wrapx">
+  <input class="grow" type="search" name="q" value="{{ query }}" placeholder="Ism, telefon yoki Telegram ID" aria-label="Qidiruv" style="min-width:180px">
+  <select name="rol" aria-label="Rol" style="width:auto">
+    <option value="">Barcha rollar</option>
+    {% for v, label in roles %}<option value="{{ v }}" {% if role == v %}selected{% endif %}>{{ label }}</option>{% endfor %}
+  </select>
+  <button class="btn ghost">Qidirish</button>
+</form>
+{% for u in users %}
+<div class="card">
+  <div class="row between wrapx">
+    <div class="grow"><div class="title">{{ u.display_name }}{% if not u.is_active %} <span class="tag bad">Bloklangan</span>{% endif %}</div>
+    <div class="muted small">{{ u.phone|default:"telefon yo'q" }} · ID {{ u.telegram_id|default:"—" }}</div></div>
+    {% if u.pk != user.pk %}
+    <form method="post" action="{% url 'a_user_update' u.pk %}" class="row">{% csrf_token %}
+      <select name="role" aria-label="Rol" style="width:auto" onchange="this.form.submit()">
+        {% for v, label in roles %}<option value="{{ v }}" {% if u.role == v %}selected{% endif %}>{{ label }}</option>{% endfor %}
+      </select>
+      <button class="btn sm {% if u.is_active %}danger{% else %}ghost{% endif %}" name="toggle_active" value="1">{% if u.is_active %}Bloklash{% else %}Ochish{% endif %}</button>
+    </form>
+    {% else %}<span class="tag">Siz</span>{% endif %}
+  </div>
+</div>
+{% empty %}<div class="card empty-state">Topilmadi.</div>{% endfor %}
+{% endblock %}

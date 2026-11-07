@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}{{ exam.title }}{% endblock %}
+{% block content %}
+<h1>{{ exam.title }}</h1>
+<div class="card">
+  <div class="row between wrapx">
+    <div>{% if exam.is_published %}<span class="tag ok">E'lon qilingan</span>{% else %}<span class="tag plain">Qoralama</span>{% endif %}
+      {% if exam.is_public %}<span class="tag">Hamma uchun</span>{% endif %}
+      {% for g in exam.groups.all %}<span class="tag">{{ g.name }}</span> {% endfor %}
+    </div>
+    <span class="muted small">{{ questions|length }} savol · {{ exam.duration_min }} daqiqa</span>
+  </div>
+  {% if missing %}<div class="msg mt mb0" style="background:var(--warn-bg);color:var(--warn)">Kalitsiz savollar: {{ missing|join:", " }}</div>{% endif %}
+  <div class="row wrapx mt">
+    <form method="post" action="{% url 't_publish' exam.pk %}">{% csrf_token %}
+      <button class="btn sm {% if exam.is_published %}ghost{% endif %}">{% if exam.is_published %}E'londan olish{% else %}E'lon qilish{% endif %}</button></form>
+    <a class="btn ghost sm" href="{% url 't_exam_edit' exam.pk %}">Sozlamalar</a>
+    <a class="btn ghost sm" href="{% url 't_pdf' exam.pk %}">PDF yuklash</a>
+    <a class="btn ghost sm" href="{% url 't_question_new' exam.pk %}">+ Savol</a>
+    <a class="btn ghost sm" href="{% url 't_results' exam.pk %}">Natijalar ({{ attempt_count }})</a>
+    {% if not attempt_count %}<form method="post" action="{% url 't_exam_delete' exam.pk %}" data-confirm="Test butunlay o'chirilsinmi?">{% csrf_token %}<button class="btn danger sm">O'chirish</button></form>{% endif %}
+  </div>
+</div>
+{% if questions %}
+<form method="post">{% csrf_token %}
+  <h2>Savollar va javoblar kaliti</h2>
+  {% for q in questions %}
+  <div class="card key-q">
+    <div class="row between"><b>{{ q.number }}-savol</b>
+      <span class="row"><span class="tag plain">{{ q.get_kind_display }}</span><a class="small" href="{% url 't_question' exam.pk q.pk %}">Tahrirlash</a></span></div>
+    {% if q.text %}<div class="qtext">{{ q.text }}</div>{% endif %}
+    {% if q.image %}<img class="qimg" loading="lazy" width="{{ q.image.width }}" height="{{ q.image.height }}" src="{{ q.image.url }}" alt="{{ q.number }}-savol sharti">{% endif %}
+    {% if q.kind == 'open' %}
+      <div class="two">
+        <div><label for="a{{ q.pk }}">a) javobi</label><input id="a{{ q.pk }}" name="a_{{ q.pk }}" value="{{ q.answer_a }}" maxlength="120" autocomplete="off"></div>
+        <div><label for="b{{ q.pk }}">b) javobi</label><input id="b{{ q.pk }}" name="b_{{ q.pk }}" value="{{ q.answer_b }}" maxlength="120" autocomplete="off"></div>
+      </div>
+    {% else %}
+      <div class="seg" role="radiogroup" aria-label="{{ q.number }}-savol to'g'ri javobi">
+        {% for letter in q.letters %}
+        <input type="radio" id="c{{ q.pk }}{{ letter }}" name="c_{{ q.pk }}" value="{{ letter }}" {% if q.correct == letter %}checked{% endif %}>
+        <label for="c{{ q.pk }}{{ letter }}">{{ letter }}</label>
+        {% endfor %}
+      </div>
+    {% endif %}
+  </div>
+  {% endfor %}
+  <div class="savebar"><button class="btn block">Kalitni saqlash</button></div>
+</form>
+{% else %}
+<div class="card empty-state">Savollar yo'q. PDF yuklang yoki savolni qo'lda qo'shing.</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}PDF yuklash{% endblock %}
+{% block content %}
+<h1>PDF dan savollar</h1>
+<p class="muted">{{ exam.title }}</p>
+<form method="post" enctype="multipart/form-data" class="card form">{% csrf_token %}
+  {{ form.as_div }}
+  <button class="btn block">Yuklash va kesish</button>
+</form>
+<div class="card small">
+  <h2>Qanday ishlaydi</h2>
+  <p>Savollar raqami bo'yicha topiladi («1.», «1-savol:», «1-misol.») va har biri rasm qilib kesiladi. Oxirida «JAVOBLAR» jadvali bo'lsa, yopiq savollar kaliti avtomatik olinadi.</p>
+  <p class="mb0"><b>Diqqat:</b> to'g'ri javobi belgilangan («kalitli») PDF yuklamang, belgi rasmda ko'rinib qoladi.</p>
+</div>
+<a class="btn ghost block" href="{% url 't_exam' exam.pk %}">O'tkazib yuborish</a>
+{% endblock %}

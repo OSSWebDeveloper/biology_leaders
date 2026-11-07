@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Natijalar{% endblock %}
+{% block content %}
+<h1>Natijalar</h1>
+<p class="muted">{{ exam.title }}</p>
+<div class="stats">
+  <div class="stat"><b>{{ attempts|length }}</b><span>Yakunlangan</span></div>
+  <div class="stat"><b>{{ in_progress }}</b><span>Hozir yechmoqda</span></div>
+  <div class="stat"><b>{% if average is not None %}{{ average|floatformat:1 }}{% else %}—{% endif %}</b><span>O'rtacha ball</span></div>
+</div>
+<div class="card">
+  <div class="row between"><h2 class="mb0">O'quvchilar</h2>{% if attempts %}<a class="btn ghost sm" href="{% url 't_results_xlsx' exam.pk %}">Excel</a>{% endif %}</div>
+  <div class="table-wrap"><table class="t">
+    <tr><th>#</th><th>F.I.Sh.</th><th>To'g'ri</th><th>Ball</th><th>Daraja</th></tr>
+    {% for a in attempts %}
+    <tr><td>{{ forloop.counter }}</td><td><a href="{% url 't_attempt' a.pk %}">{{ a.student.display_name }}</a></td><td>{{ a.correct_items }}/{{ a.total_items }}</td><td><b>{{ a.score }}</b></td><td>{{ a.grade|default:"—" }}</td></tr>
+    {% empty %}<tr><td colspan="5" class="empty-state">Hali natija yo'q.</td></tr>{% endfor %}
+  </table></div>
+</div>
+{% if attempts %}
+<div class="card">
+  <h2>Savollar bo'yicha o'zlashtirish</h2>
+  <div class="heat">{% for s in stats %}<div class="{{ s.level }}"><b>{{ s.q.number }}</b><small>{{ s.pct }}%</small></div>{% endfor %}</div>
+</div>
+{% endif %}
+<a class="btn ghost block" href="{% url 't_exam' exam.pk %}">Testga qaytish</a>
+{% endblock %}

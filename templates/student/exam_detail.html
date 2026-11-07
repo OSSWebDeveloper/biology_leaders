@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}{{ exam.title }}{% endblock %}
+{% block content %}
+<h1>{{ exam.title }}</h1>
+<div class="card">
+  {% if exam.description %}<p>{{ exam.description }}</p>{% endif %}
+  <table class="t">
+    <tr><td class="muted">Fan</td><td class="right">{{ exam.subject }}</td></tr>
+    <tr><td class="muted">Vaqt</td><td class="right">{{ exam.duration_min }} daqiqa</td></tr>
+    <tr><td class="muted">Yopiq test</td><td class="right">{{ counts.mcq }} ta</td></tr>
+    {% if counts.matching %}<tr><td class="muted">Moslashtirish</td><td class="right">{{ counts.matching }} ta</td></tr>{% endif %}
+    {% if counts.open %}<tr><td class="muted">Yozma (a, b)</td><td class="right">{{ counts.open }} ta</td></tr>{% endif %}
+    {% if exam.closes_at %}<tr><td class="muted">Yopiladi</td><td class="right">{{ exam.closes_at|date:"d.m.Y H:i" }}</td></tr>{% endif %}
+    {% if exam.max_attempts %}<tr><td class="muted">Urinishlar</td><td class="right">{{ exam.max_attempts }} ta</td></tr>{% endif %}
+  </table>
+</div>
+{% if active %}
+  <a class="btn block" href="{% url 'attempt' active.pk %}">Davom ettirish</a>
+{% elif allowed %}
+  <form method="post" action="{% url 'attempt_start' exam.pk %}" data-confirm="Boshlaganingizdan so'ng vaqt to'xtamaydi. Boshlaysizmi?">{% csrf_token %}
+    <button class="btn block">Testni boshlash</button>
+  </form>
+{% else %}
+  <div class="msg">{{ reason }}</div>
+{% endif %}
+<p class="muted small mt">Natija taxminiy: haqiqiy imtihon Rasch modeli bilan baholanadi. Noto'g'ri javob uchun ball ayirilmaydi.</p>
+{% if attempts %}
+<div class="card mt">
+  <h2>Urinishlaringiz</h2>
+  <table class="t">
+    {% for a in attempts %}
+    <tr><td><a href="{% url 'attempt_result' a.pk %}">{{ a.finished_at|date:"d.m.Y H:i" }}</a></td><td>{{ a.correct_items }}/{{ a.total_items }}</td><td class="right"><b>{{ a.score }}</b> · {{ a.grade|default:"—" }}</td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% endif %}
+<a class="btn ghost block mt" href="{% url 'leaderboard' exam.pk %}">🏆 Reyting</a>
+{% endblock %}
