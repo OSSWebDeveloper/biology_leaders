@@ -80,8 +80,8 @@ def t_exam(request, pk):
         changed = []
         for q in questions:
             if q.kind == Question.Kind.OPEN:
-                q.answer_a = request.POST.get(f'a_{q.pk}', q.answer_a).strip()[:120]
-                q.answer_b = request.POST.get(f'b_{q.pk}', q.answer_b).strip()[:120]
+                q.answer_a = request.POST.get(f'a_{q.pk}', q.answer_a).strip()
+                q.answer_b = request.POST.get(f'b_{q.pk}', q.answer_b).strip()
             else:
                 value = request.POST.get(f'c_{q.pk}', q.correct)
                 q.correct = value if value in q.letters else ''

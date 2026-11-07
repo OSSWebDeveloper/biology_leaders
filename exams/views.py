@@ -93,7 +93,7 @@ def attempt_view(request, pk):
         questions.append({
             'id': q.pk, 'number': q.number, 'kind': q.kind, 'text': q.text,
             'image': q.image.url if q.image else '', 'options': q.options, 'letters': q.letters,
-            'part_a': q.part_a, 'part_b': q.part_b,
+            'part_a': q.part_a, 'part_b': q.part_b, 'two_parts': q.two_parts,
             'choice': answer.choice if answer else '',
             'value_a': answer.value_a if answer else '', 'value_b': answer.value_b if answer else '',
         })

@@ -1,5 +1,13 @@
 # Versiyalar tarixi
 
+## 1.5.0 — 2026-11-08
+
+Kalit uch bosqichda, yozma savolga bitta javob va or
+
+- 4 va 6 variantli bo'limlar: 1a2b3c ko'rinishida, raqam bo'lim ichida
+- Yozma savolga bittadan javob, or bilan cheksiz to'g'ri variant
+- Eski a/b testlar o'zgarmaydi
+
 ## 1.4.2 — 2026-11-08
 
 Boshlang'ich tuzilish: 32 ta 4 variantli, 3 ta 6 variantli, 10 ta yozma

@@ -12,6 +12,7 @@ SCALE_MAX = 75
 GRADES = [(70, 'A+'), (65, 'A'), (60, 'B+'), (55, 'B'), (50, 'C+'), (46, 'C')]
 MAX_INPUT_LEN = 64
 _TOLERANCE = 1e-6
+_ALTERNATIVES = re.compile(r'\s+or\s+|\|', re.IGNORECASE)
 
 
 def grade_for(score):
@@ -145,11 +146,11 @@ def parse_value(text):
 
 
 def answers_match(given, key):
-    """O'quvchi javobi kalitga mosmi. Kalitda bir nechta ko'rinish '|' bilan yoziladi."""
+    """O'quvchi javobi kalitga mosmi. Kalitda to'g'ri javoblar soni cheklanmagan: 'or' yoki '|' bilan."""
     if not str(given).strip():
         return False
     given_value = parse_value(given)
-    for option in str(key).split('|'):
+    for option in _ALTERNATIVES.split(str(key)):
         if not option.strip():
             continue
         key_value = parse_value(option)
@@ -180,7 +181,7 @@ def grade_attempt(attempt):
             continue
         if question.kind == question.Kind.OPEN:
             answer.correct_a = answers_match(answer.value_a, question.answer_a)
-            answer.correct_b = answers_match(answer.value_b, question.answer_b)
+            answer.correct_b = question.two_parts and answers_match(answer.value_b, question.answer_b)
         else:
             answer.correct_a = bool(answer.choice) and answer.choice == question.correct
             answer.correct_b = False

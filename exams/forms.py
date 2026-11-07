@@ -39,7 +39,7 @@ class QuestionForm(forms.ModelForm):
 
     class Meta:
         model = Question
-        fields = ['number', 'kind', 'text', 'image', 'correct', 'part_a', 'part_b', 'answer_a', 'answer_b']
+        fields = ['number', 'kind', 'text', 'image', 'correct', 'two_parts', 'part_a', 'part_b', 'answer_a', 'answer_b']
         widgets = {'text': forms.Textarea(attrs={'rows': 4})}
 
     def __init__(self, *args, **kwargs):

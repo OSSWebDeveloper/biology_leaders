@@ -80,7 +80,7 @@ class Question(models.Model):
     class Kind(models.TextChoices):
         MCQ = 'mcq', 'Yopiq test (A–D)'
         MATCHING = 'matching', 'Moslashtirish (A–F)'
-        OPEN = 'open', 'Yozma javob (a, b)'
+        OPEN = 'open', 'Yozma javob'
 
     exam = models.ForeignKey(Exam, on_delete=models.CASCADE, related_name='questions')
     number = models.PositiveIntegerField("Raqami")
@@ -92,9 +92,11 @@ class Question(models.Model):
     correct = models.CharField("To'g'ri variant", max_length=1, blank=True)
     part_a = models.CharField("a) band matni", max_length=300, blank=True)
     part_b = models.CharField("b) band matni", max_length=300, blank=True)
-    answer_a = models.CharField("a) javobi", max_length=120, blank=True,
-                                help_text="Bir nechta to'g'ri ko'rinish: 2√5 | √20")
-    answer_b = models.CharField("b) javobi", max_length=120, blank=True)
+    two_parts = models.BooleanField("a) va b) bandli", default=True,
+                                    help_text="Belgilanmasa, yozma savolga bitta javob yoziladi")
+    answer_a = models.TextField("Javob (a)", blank=True,
+                                help_text="Bir nechta to'g'ri javob: 2√5 or √20")
+    answer_b = models.TextField("b) javobi", blank=True)
 
     class Meta:
         ordering = ['number']
@@ -111,12 +113,12 @@ class Question(models.Model):
 
     def has_key(self):
         if self.kind == self.Kind.OPEN:
-            return bool(self.answer_a.strip() and self.answer_b.strip())
+            return bool(self.answer_a.strip() and (self.answer_b.strip() or not self.two_parts))
         return bool(self.correct)
 
     @property
     def max_items(self):
-        return 2 if self.kind == self.Kind.OPEN else 1
+        return 2 if self.kind == self.Kind.OPEN and self.two_parts else 1
 
 
 class Attempt(models.Model):

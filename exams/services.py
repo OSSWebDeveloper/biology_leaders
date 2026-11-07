@@ -119,7 +119,8 @@ def create_answer_sheet(exam, counts=None):
     """Javob varag'i: savol matni guruhga yuborilgan faylda, raqamlar turlar bo'yicha ketma-ket."""
     counts = counts or DEFAULT_SHEET
     kinds = [kind for kind in ('mcq', 'matching', 'open') for _ in range(counts.get(kind, 0))]
-    Question.objects.bulk_create(Question(exam=exam, number=n, kind=kind) for n, kind in enumerate(kinds, 1))
+    Question.objects.bulk_create(Question(exam=exam, number=n, kind=kind, two_parts=False)
+                                 for n, kind in enumerate(kinds, 1))
 
 
 def save_test_file(exam, extension, data):

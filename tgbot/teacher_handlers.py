@@ -36,6 +36,15 @@ BTN_LAUNCH = '🚀 Joriy etish'
 MAX_DOWNLOAD_MB = 20  # Bot API bundan kattasini yuklab bermaydi
 DEFAULT_DURATION_MIN = 150
 MAX_QUESTIONS = 99  # kalit qatorida raqam ikki xonali
+KEY_STAGES = (('mcq', 'keys_mcq'), ('matching', 'keys_matching'), ('open', 'keys_open'))
+COMPACT_HELP = {
+    'mcq': ("<b>1-bo'lim: 4 variantli savollar</b> ({n} ta)\n\nTo'g'ri javoblarni shunday yuboring:\n"
+            "<code>1a2b3c4d5a6b</code>"),
+    'matching': ("<b>2-bo'lim: 6 variantli savollar</b> ({n} ta)\n\nTo'g'ri javoblarni shunday yuboring:\n"
+                 "<code>1a2f3d</code>\n\nRaqamlar shu bo'lim ichida 1 dan boshlanadi."),
+}
+WRITTEN_HELP = ("<b>3-bo'lim: yozma savollar</b> ({n} ta)\n\nHar bir savolga bitta javob yuboring. "
+                "Bir nechta to'g'ri javob bo'lsa, or bilan yozing:\n<code>2√5 or √20 or 4,47</code>")
 KIND_LABELS = {'mcq': '4 variantli', 'matching': '6 variantli', 'open': 'Yozma ish'}
 
 menu = ReplyKeyboardMarkup(
@@ -47,15 +56,6 @@ def times_help():
     tomorrow = timezone.localtime() + datetime.timedelta(days=1)
     return ("Boshlanish va tugash vaqtini ikki qatorda yozing:\n\n"
             f"<code>{tomorrow:%d.%m.%Y} 09:00\n{tomorrow:%d.%m.%Y} 12:00</code>")
-
-
-def keys_help(first):
-    """Namuna testdagi haqiqiy raqamlardan tuziladi: first = {tur: birinchi raqam}."""
-    samples = {'mcq': 'A', 'matching': 'F', 'open': '2√5; 16/3'}
-    sample = '\n'.join(f'{first[kind]} {value}' for kind, value in samples.items() if kind in first)
-    note = "Yozma savolda a) va b) javoblari <code>;</code> bilan ajratiladi. " if 'open' in first else ''
-    return (f"Javoblarni qatorlar bilan yuboring:\n\n<code>{sample}</code>\n\n"
-            f"{note}Bir xabarda ham, bo'lib ham yuborsa bo'ladi.")
 
 
 def _counts_text(counts):
@@ -72,15 +72,16 @@ def _counts_keyboard(counts):
 
 
 _DATETIME = re.compile(r'(\d{1,2})[./-](\d{1,2})[./-](\d{4})[ ,T]+(\d{1,2})[:.](\d{2})')
-_LETTER_LINE = re.compile(r'^(\d{1,2})\s*[-.):]?\s*([A-Fa-f])$')
-_VALUE_LINE = re.compile(r'^(\d{1,2})(?:\s*[.):]\s*|\s+)(.+)$')
+_COMPACT_PAIR = re.compile(r'(\d{1,2})([A-Za-z])')
 
 
 class NewExam(StatesGroup):
     file = State()
     count = State()
     title = State()
-    keys = State()
+    keys_mcq = State()
+    keys_matching = State()
+    keys_open = State()
 
 
 class Launch(StatesGroup):
@@ -132,51 +133,79 @@ def parse_times(text, now=None):
     return opens, closes
 
 
-def parse_key_lines(text):
-    """Qatorlardan [(raqam, qiymat)] va o'qib bo'lmagan qatorlarni qaytaradi."""
-    pairs, bad = [], []
-    for raw in text.splitlines():
-        line = raw.strip()
-        if not line:
-            continue
-        match = _LETTER_LINE.match(line) or _VALUE_LINE.match(line)
-        if match:
-            pairs.append((int(match.group(1)), match.group(2).strip()))
-        else:
-            bad.append(line)
-    return pairs, bad
+def parse_compact_keys(text):
+    """«1a2b3c» ko'rinishidagi kalitni [(1, 'A'), ...] ga aylantiradi; boshqa ko'rinish bo'lsa None."""
+    cleaned = re.sub(r'[\s,;.:)\-]+', '', text)
+    if not re.fullmatch(r'(?:\d{1,2}[A-Za-z])+', cleaned):
+        return None
+    return [(int(number), letter.upper()) for number, letter in _COMPACT_PAIR.findall(cleaned)]
 
 
 @sync_to_async
-def _apply_keys(exam_id, text):
-    """Kalitni saqlaydi: (saqlangan soni, xato qatorlar, kalitsiz raqamlar)."""
-    exam = Exam.objects.get(pk=exam_id)
-    pairs, errors = parse_key_lines(text)
-    questions = {q.number: q for q in exam.questions.all()}
+def _apply_compact(exam_id, kind, text):
+    """Bo'lim kaliti: raqam bo'lim ichida 1 dan sanaladi. (saqlangan, xatolar, kalitsiz raqamlar)."""
+    questions = list(Question.objects.filter(exam_id=exam_id, kind=kind).order_by('number'))
+    pairs = parse_compact_keys(text)
+    errors = []
     saved = 0
-    for number, value in pairs:
-        question = questions.get(number)
-        if question is None:
-            errors.append(f"{number}: bunday savol yo'q")
-        elif question.kind == Question.Kind.OPEN:
-            parts = [part.strip() for part in value.split(';')]
-            if len(parts) != 2 or not all(parts) or max(map(len, parts)) > 120:
-                errors.append(f"{number}: a) va b) javobini ; bilan yozing")
-                continue
-            question.answer_a, question.answer_b = parts
-            question.save(update_fields=['answer_a', 'answer_b'])
-            saved += 1
-        else:
-            letter = value.upper()
-            if len(letter) != 1 or letter not in question.letters:
-                errors.append(f"{number}: {question.letters[0]}–{question.letters[-1]} bo'lishi kerak")
-                continue
-            question.correct = letter
-            question.save(update_fields=['correct'])
-            saved += 1
-    if saved and exam.attempts.filter(finished_at__isnull=False).exists():
+    if pairs is None:
+        errors.append("Ko'rinishi noto'g'ri")
+        pairs = []
+    for number, letter in pairs:
+        if not 1 <= number <= len(questions):
+            errors.append(f"{number}: bu bo'limda bunday savol yo'q")
+            continue
+        question = questions[number - 1]
+        if letter not in question.letters:
+            errors.append(f"{number}{letter.lower()}: {question.letters[0]}–{question.letters[-1]} bo'lishi kerak")
+            continue
+        question.correct = letter
+        question.save(update_fields=['correct'])
+        saved += 1
+    missing = [index for index, question in enumerate(questions, 1) if not question.has_key()]
+    return saved, errors, missing
+
+
+@sync_to_async
+def _sections(exam_id):
+    result = {kind: {'numbers': [], 'missing': []} for kind, _ in KEY_STAGES}
+    for question in Question.objects.filter(exam_id=exam_id).order_by('number'):
+        result[question.kind]['numbers'].append(question.number)
+        if not question.has_key():
+            result[question.kind]['missing'].append(question.number)
+    return result
+
+
+@sync_to_async
+def _written_info(exam_id, number):
+    return Question.objects.only('two_parts', 'answer_a', 'answer_b').get(exam_id=exam_id, number=number)
+
+
+@sync_to_async
+def _save_written(exam_id, number, text):
+    """Yozma javobni saqlaydi. Eski a/b savolda ikki qism ; bilan yoziladi. Xato matni yoki None."""
+    question = Question.objects.get(exam_id=exam_id, number=number)
+    if question.two_parts:
+        parts = [part.strip() for part in text.split(';')]
+        if len(parts) != 2 or not all(parts):
+            return "Bu savolda a) va b) bor: ikkalasini ; bilan yozing"
+        question.answer_a, question.answer_b = parts
+    else:
+        question.answer_a = text.strip()
+    question.save(update_fields=['answer_a', 'answer_b'])
+    return None
+
+
+@sync_to_async
+def _is_complete(exam_id):
+    return not Exam.objects.get(pk=exam_id).missing_keys()
+
+
+@sync_to_async
+def _regrade(exam_id):
+    exam = Exam.objects.get(pk=exam_id)
+    if exam.attempts.filter(finished_at__isnull=False).exists():
         regrade_exam(exam)
-    return saved, errors, exam.missing_keys()
 
 
 @sync_to_async
@@ -199,14 +228,6 @@ def _create_questions(exam_id, counts):
 @sync_to_async
 def _set_fields(exam_id, **fields):
     Exam.objects.filter(pk=exam_id).update(**fields)
-
-
-@sync_to_async
-def _first_numbers(exam_id):
-    first = {}
-    for kind, number in Question.objects.filter(exam_id=exam_id).order_by('number').values_list('kind', 'number'):
-        first.setdefault(kind, number)
-    return first
 
 
 @sync_to_async
@@ -371,9 +392,23 @@ async def cmd_keys(message: Message, command: CommandObject, state: FSMContext, 
         await message.answer('Test topilmadi. Masalan: /kalit 7KM3QX')
         return
     await _leave_flow(state)
-    await state.set_state(NewExam.keys)
-    await state.update_data(exam_id=exam.pk, creating=False, editing=exam.is_published)
-    await message.answer(keys_help(await _first_numbers(exam.pk)), parse_mode='HTML')
+    await state.update_data(exam_id=exam.pk, creating=False, editing=exam.is_published,
+                            review=await _is_complete(exam.pk))
+    await _next_section(message, state)
+
+
+@router.message(Command('otkaz'))
+async def cmd_skip(message: Message, state: FSMContext):
+    """To'liq testni tahrirlaganda: joriy javobni o'zgartirmasdan keyingisiga o'tish."""
+    data = await state.get_data()
+    current = await state.get_state()
+    if not data.get('review') or current not in {getattr(NewExam, name).state for _, name in KEY_STAGES}:
+        await message.answer("Hozir o'tkazib bo'lmaydi.")
+        return
+    if current == NewExam.keys_open.state:
+        await _ask_written(message, state, data['pending'][1:])
+        return
+    await _next_section(message, state, after='mcq' if current == NewExam.keys_mcq.state else 'matching')
 
 
 @router.message(F.text == BTN_NEW)
@@ -485,28 +520,97 @@ async def got_title(message: Message, state: FSMContext):
         return
     data = await state.get_data()
     await _set_fields(data['exam_id'], title=title)
-    await state.set_state(NewExam.keys)
-    await message.answer(keys_help(await _first_numbers(data['exam_id'])), parse_mode='HTML')
+    await _next_section(message, state)
 
 
-@router.message(NewExam.keys, F.text)
-async def got_keys(message: Message, state: FSMContext):
+async def _next_section(message, state, after=None):
+    """Keyingi bo'limga o'tadi: bo'sh bo'lim o'tkaziladi, tahrirda (review) to'liqlari ham ko'rsatiladi."""
     data = await state.get_data()
-    saved, errors, missing = await _apply_keys(data['exam_id'], message.text)
-    lines = [f'Saqlandi: {saved} ta.']
-    if errors:
-        lines += ["O'qilmadi:", *[notify.esc(error) for error in errors[:20]]]
-    if missing:
-        lines.append(f'Kalitsiz savollar: {_format_missing(missing)}')
-        await message.answer('\n'.join(lines))
+    sections = await _sections(data['exam_id'])
+    kinds = [kind for kind, _ in KEY_STAGES]
+    review = data.get('review')
+    for kind, name in KEY_STAGES[kinds.index(after) + 1 if after else 0:]:
+        section = sections[kind]
+        if not section['numbers'] or (not review and not section['missing']):
+            continue
+        await state.set_state(getattr(NewExam, name))
+        skip = "\n\nO'zgartirmaslik uchun: /otkaz" if review else ''
+        if kind == 'open':
+            await message.answer(WRITTEN_HELP.format(n=len(section['numbers'])), parse_mode='HTML')
+            await _ask_written(message, state, section['numbers'] if review else section['missing'])
+        else:
+            await message.answer(COMPACT_HELP[kind].format(n=len(section['numbers'])) + skip, parse_mode='HTML')
         return
-    if errors:
-        await message.answer('\n'.join(lines))
+    await _keys_complete(message, state)
+
+
+async def _ask_written(message, state, pending):
+    if not pending:
+        await _keys_complete(message, state)
+        return
+    await state.update_data(pending=pending)
+    data = await state.get_data()
+    question = await _written_info(data['exam_id'], pending[0])
+    text = f'{pending[0]}-savol javobi:'
+    if question.two_parts:
+        text = f'{pending[0]}-savol javobi (a; b):'
+    if data.get('review'):
+        current = f'{question.answer_a}; {question.answer_b}' if question.two_parts else question.answer_a
+        text += f'\nHozirgi: {current}\nO\'zgartirmaslik uchun: /otkaz'
+    await message.answer(text)
+
+
+async def _keys_complete(message, state):
+    data = await state.get_data()
+    await _regrade(data['exam_id'])
     if data.get('editing'):
         await state.clear()
         await message.answer('Javoblar yangilandi, natijalar qayta hisoblandi.', reply_markup=menu)
         return
     await _finish(message, state, data['exam_id'])
+
+
+async def _got_compact(message, state, kind):
+    data = await state.get_data()
+    saved, errors, missing = await _apply_compact(data['exam_id'], kind, message.text)
+    lines = []
+    if saved:
+        lines.append(f'Saqlandi: {saved} ta.')
+    lines += errors[:20]
+    if errors and not saved and kind in COMPACT_HELP:
+        lines.append('Masalan: ' + ('1a2b3c4d' if kind == 'mcq' else '1a2f3d'))
+    if missing and not data.get('review'):
+        lines.append(f'Kalitsiz: {_format_missing(missing)}')
+    if lines:
+        await message.answer('\n'.join(lines))
+    if not missing and (saved or not errors):
+        await _next_section(message, state, after=kind)
+
+
+@router.message(NewExam.keys_mcq, F.text)
+async def got_keys_mcq(message: Message, state: FSMContext):
+    await _got_compact(message, state, 'mcq')
+
+
+@router.message(NewExam.keys_matching, F.text)
+async def got_keys_matching(message: Message, state: FSMContext):
+    await _got_compact(message, state, 'matching')
+
+
+@router.message(NewExam.keys_open, F.text)
+async def got_written(message: Message, state: FSMContext):
+    """Bitta qator bitta savolning javobi: bir xabarda bir nechta qator ham bo'lishi mumkin."""
+    data = await state.get_data()
+    pending = list(data['pending'])
+    for line in filter(None, map(str.strip, message.text.splitlines())):
+        if not pending:
+            break
+        error = await _save_written(data['exam_id'], pending[0], line)
+        if error:
+            await message.answer(error)
+            break
+        pending.pop(0)
+    await _ask_written(message, state, pending)
 
 
 async def _finish(message, state, exam_id):

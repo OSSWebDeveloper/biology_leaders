@@ -1,6 +1,8 @@
 {% with q=row.q a=row.a %}
 <div class="answer-line">
-{% if q.kind == 'open' %}
+{% if q.kind == 'open' and not q.two_parts %}
+  <div>Javobingiz: <b>{{ a.value_a|default:"—" }}</b>{% if a.value_a %} {% if a.correct_a %}<span class="tag ok">to'g'ri</span>{% else %}<span class="tag bad">xato</span>{% endif %}{% endif %}{% if show %} <span class="muted">· to'g'ri: {{ q.answer_a }}</span>{% endif %}</div>
+{% elif q.kind == 'open' %}
   <div>a) Javobingiz: <b>{{ a.value_a|default:"—" }}</b>{% if a.value_a %} {% if a.correct_a %}<span class="tag ok">to'g'ri</span>{% else %}<span class="tag bad">xato</span>{% endif %}{% endif %}{% if show %} <span class="muted">· to'g'ri: {{ q.answer_a }}</span>{% endif %}</div>
   <div>b) Javobingiz: <b>{{ a.value_b|default:"—" }}</b>{% if a.value_b %} {% if a.correct_b %}<span class="tag ok">to'g'ri</span>{% else %}<span class="tag bad">xato</span>{% endif %}{% endif %}{% if show %} <span class="muted">· to'g'ri: {{ q.answer_b }}</span>{% endif %}</div>
 {% else %}

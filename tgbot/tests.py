@@ -16,7 +16,7 @@ from django.utils import timezone
 from accounts.models import StudyGroup, User
 from exams.models import Exam
 from tgbot.handlers import router
-from tgbot.teacher_handlers import BTN_LAUNCH, BTN_NEW, parse_key_lines, parse_times
+from tgbot.teacher_handlers import BTN_LAUNCH, BTN_NEW, parse_compact_keys, parse_times
 from tgbot.teacher_handlers import router as teacher_router
 
 TG_ID = 5001
@@ -102,10 +102,11 @@ class BotTests(TransactionTestCase):
 
 
 class TeacherKeyParsingTests(TransactionTestCase):
-    def test_key_lines(self):
-        pairs, bad = parse_key_lines('1 A\n2-c\n3.B\n4) D\n33F\n36 2√5; 16/3\n37 -1/16; 3,5\n\nyomon qator')
-        self.assertEqual(pairs, [(1, 'A'), (2, 'c'), (3, 'B'), (4, 'D'), (33, 'F'), (36, '2√5; 16/3'), (37, '-1/16; 3,5')])
-        self.assertEqual(bad, ['yomon qator'])
+    def test_compact_keys(self):
+        self.assertEqual(parse_compact_keys('1a2B3c4d5a6b'), [(1, 'A'), (2, 'B'), (3, 'C'), (4, 'D'), (5, 'A'), (6, 'B')])
+        self.assertEqual(parse_compact_keys('10 a, 11-b\n12.C'), [(10, 'A'), (11, 'B'), (12, 'C')])
+        for bad in ('', 'abc', '1a2', '1 2 3', '123a'):
+            self.assertIsNone(parse_compact_keys(bad), bad)
 
     def test_times(self):
         now = timezone.make_aware(datetime.datetime(2026, 11, 1, 8, 0))
@@ -217,18 +218,72 @@ class TeacherBotTests(TransactionTestCase):
         self.assertIn('Kamida', self.session.sent[-1].text)
         self.assertEqual(Exam.objects.get().questions.count(), 0)
 
-    def test_keys_sample_follows_real_numbers(self):
+    def small_exam(self):
+        '''2 ta 4 variantli, 3 ta 6 variantli, 2 ta yozma.'''
         self.make_teacher()
         self.upload()
         for _ in range(30):
             self.press('count:mcq:-')
-        for _ in range(9):
+        for _ in range(8):
             self.press('count:open:-')
         self.press('count:ok')
-        reply = self.send('Kichik test')[0]
-        self.assertIn('1 A\n3 F\n6 2√5; 16/3', reply)
-        self.assertIn('✅ Test saqlandi.', self.send('1 A\n2 B\n3 F\n4 E\n5 A\n6 1; 2'))
-        self.assertFalse(Exam.objects.get().missing_keys())
+        return self.send('Kichik test')
+
+    def test_three_key_stages(self):
+        self.assertIn('1-bo', self.small_exam()[0])
+        exam = Exam.objects.get()
+        # noto'g'ri ko'rinish va begona raqam: bo'limda qoladi
+        self.assertIn("noto'g'ri", self.send('salom')[0])
+        replies = self.send('1a9b')
+        self.assertIn('Saqlandi: 1', replies[0])
+        self.assertIn('9:', replies[0])
+        self.assertIn('Kalitsiz: 2', replies[0])
+        self.assertIn('A–D', self.send('2f')[0])
+        replies = self.send('2d')
+        self.assertIn('2-bo', replies[-1])
+        # 6 variantli: raqam bo'lim ichida, 1a2f3d -> 3, 4, 5 savollar
+        replies = self.send('1a2f3d')
+        self.assertEqual(list(exam.questions.order_by('number').values_list('correct', flat=True)),
+                         ['A', 'D', 'A', 'F', 'D', '', ''])
+        self.assertIn('3-bo', replies[-2])
+        self.assertEqual(replies[-1], '6-savol javobi:')
+        # yozma: bittadan javob, or bilan cheksiz variant
+        self.assertEqual(self.send('2√5 or √20 or 4,47 or 9'), ['7-savol javobi:'])
+        replies = self.send('12')
+        self.assertIn('✅ Test saqlandi.', replies)
+        written = exam.questions.get(number=6)
+        self.assertEqual(written.answer_a, '2√5 or √20 or 4,47 or 9')
+        self.assertEqual(written.answer_b, '')
+        self.assertFalse(written.two_parts)
+        self.assertEqual(written.max_items, 1)
+        self.assertFalse(exam.missing_keys())
+
+    def test_written_answers_can_come_as_lines(self):
+        self.small_exam()
+        self.send('1a2b')
+        self.send('1a2b3c')
+        self.assertIn('✅ Test saqlandi.', self.send('5\n6 or 7'))
+        self.assertEqual(Exam.objects.get().questions.get(number=7).answer_a, '6 or 7')
+
+    def test_edit_complete_exam_with_skip(self):
+        self.small_exam()
+        self.send('1a2b')
+        self.send('1a2b3c')
+        self.send('5\n7')
+        exam = Exam.objects.get()
+        self.assertIn('/otkaz', self.send(f'/kalit {exam.access_code}')[0])
+        self.assertIn('2-bo', self.send('/otkaz')[0])
+        self.send('1b')  # bittasi o'zgardi, qolganlari to'liq: keyingi bo'limga o'tadi
+        self.assertEqual(exam.questions.get(number=3).correct, 'B')
+        replies = self.send('/otkaz')
+        self.assertIn('Hozirgi: 7', replies[0])
+        self.assertIn('✅ Test saqlandi.', self.send('8 or 9'))
+        self.assertEqual(exam.questions.get(number=6).answer_a, '5')
+        self.assertEqual(exam.questions.get(number=7).answer_a, '8 or 9')
+
+    def test_skip_not_allowed_when_filling(self):
+        self.small_exam()
+        self.assertIn("o'tkazib bo'lmaydi", self.send('/otkaz')[0])
 
     def test_full_flow_to_ready_message(self):
         teacher = self.make_teacher()
@@ -239,21 +294,17 @@ class TeacherBotTests(TransactionTestCase):
             self.press('count:open:-')
         self.press('count:ok')
         self.assertEqual(exam.questions.count(), 36)
-        # nomdan keyin vaqt emas, javoblar so'raladi
-        self.assertIn('36 2√5', self.send('Matematika 8-noyabr')[0])
-
-        # bo'lib yuborish va xato qator
-        lines = [f'{n} A' for n in range(1, 33)] + [f'{n} F' for n in range(33, 36)]
-        replies = self.send('\n'.join(lines) + '\n1 Z\n36 faqat-bitta\n99 A')
-        self.assertIn('36: a) va b)', replies[0])
-        self.assertIn('1: A–D', replies[0])
-        self.assertIn('99:', replies[0])
+        # nomdan keyin vaqt emas, kalit so'raladi
+        self.assertIn('1-bo', self.send('Matematika 8-noyabr')[0])
+        self.send(''.join(f'{n}a' for n in range(1, 32)))  # bittasi qoldi
         self.assertEqual(self.send(BTN_LAUNCH), ["Joriy etishga tayyor test yo'q. Avval yangi test yarating."])
 
         # menyuga chiqib ketganda test va javoblar yo'qolmaydi, /kalit bilan davom etadi
         self.assertTrue(Exam.objects.filter(pk=exam.pk).exists())
-        self.assertIn('Javoblarni', self.send(f'/kalit {exam.access_code}')[0])
-        replies = self.send('36 2√5; 16/3')
+        self.assertIn('1-bo', self.send(f'/kalit {exam.access_code}')[0])
+        self.send('32a')
+        self.send('1f2e3d')
+        replies = self.send('2√5 or √20')
         self.assertIn('✅ Test saqlandi.', replies)
         exam.refresh_from_db()
         self.assertFalse(exam.is_published)

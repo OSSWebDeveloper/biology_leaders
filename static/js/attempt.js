@@ -112,7 +112,7 @@
     html += '</div>';
 
     if (q.kind === 'open') {
-      html += part(q, 'a', q.part_a) + part(q, 'b', q.part_b);
+      html += part(q, 'a', q.part_a) + (q.two_parts ? part(q, 'b', q.part_b) : '');
       html += '<div class="keys" id="keys">' + ['√', 'π', '/', '-', ','].map(k => `<button type="button" data-k="${k}">${k}</button>`).join('') + '</div>';
       html += '<p class="muted small mt mb0">Masalan: 2√5, 16/3, 8π, -1/16, 3,5</p>';
     } else {
@@ -132,7 +132,7 @@
   }
 
   function part(q, name, text) {
-    return `<div class="part card mb0"><label for="v-${name}"><b>${name})</b> ${text ? esc(text) : 'javob'}</label>
+    return `<div class="part card mb0"><label for="v-${name}">${q.two_parts ? `<b>${name})</b> ` : ''}${text ? esc(text) : (q.two_parts ? 'javob' : 'Javobingiz')}</label>
       <input id="v-${name}" data-part="${name}" value="${esc(q['value_' + name]).replace(/"/g, '&quot;')}" maxlength="64"
         autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="text"></div>`;
   }

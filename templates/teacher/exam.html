@@ -36,10 +36,12 @@
     {% if q.text %}<div class="qtext">{{ q.text }}</div>{% endif %}
     {% if q.image %}<img class="qimg" loading="lazy" width="{{ q.image.width }}" height="{{ q.image.height }}" src="{{ q.image.url }}" alt="{{ q.number }}-savol sharti">{% endif %}
     {% if q.kind == 'open' %}
-      <div class="two">
-        <div><label for="a{{ q.pk }}">a) javobi</label><input id="a{{ q.pk }}" name="a_{{ q.pk }}" value="{{ q.answer_a }}" maxlength="120" autocomplete="off"></div>
-        <div><label for="b{{ q.pk }}">b) javobi</label><input id="b{{ q.pk }}" name="b_{{ q.pk }}" value="{{ q.answer_b }}" maxlength="120" autocomplete="off"></div>
-      </div>
+      {% if q.two_parts %}<div class="two">
+        <div><label for="a{{ q.pk }}">a) javobi</label><input id="a{{ q.pk }}" name="a_{{ q.pk }}" value="{{ q.answer_a }}" autocomplete="off"></div>
+        <div><label for="b{{ q.pk }}">b) javobi</label><input id="b{{ q.pk }}" name="b_{{ q.pk }}" value="{{ q.answer_b }}" autocomplete="off"></div>
+      </div>{% else %}
+      <label for="a{{ q.pk }}">Javob (bir nechtasi: 2√5 or √20)</label><input id="a{{ q.pk }}" name="a_{{ q.pk }}" value="{{ q.answer_a }}" autocomplete="off">
+      {% endif %}
     {% else %}
       <div class="seg" role="radiogroup" aria-label="{{ q.number }}-savol to'g'ri javobi">
         {% for letter in q.letters %}

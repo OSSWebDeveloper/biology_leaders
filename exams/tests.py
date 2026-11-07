@@ -60,6 +60,12 @@ class ScoringTests(TestCase):
     def test_text_answer_and_alternatives(self):
         self.assertTrue(answers_match('(-∞;3]', '(-∞; 3]'))
         self.assertTrue(answers_match('7', '5|7'))
+        self.assertTrue(answers_match('√20', '1 or 2√5 or 9 OR 8π'))
+        self.assertTrue(answers_match('9', '1 or 2√5 or 9 OR 8π'))
+        self.assertTrue(answers_match('8π', '1 or 2√5 or 9 OR 8π'))
+        self.assertFalse(answers_match('3', '1 or 2√5 or 9 OR 8π'))
+        self.assertTrue(answers_match('sor', 'sor'))  # or faqat alohida so'z bo'lganda ajratadi
+        self.assertFalse(answers_match('s', 'sor'))
         self.assertIsNone(parse_value('(((('))
 
     def test_grades(self):
@@ -192,6 +198,25 @@ class FlowTests(TestCase):
             self.assertEqual(self.client.get(reverse(name, args=[attempt.pk])).status_code, 403)
         self.assertEqual(self._answer(attempt, question=self.q1.pk, choice='B').status_code, 403)
         self.assertEqual(self.client.post(reverse('attempt_finish', args=[attempt.pk])).status_code, 403)
+
+    def test_single_answer_written_question(self):
+        q = Question.objects.create(exam=self.exam, number=4, kind='open', two_parts=False, answer_a='5 or 7')
+        self.assertTrue(q.has_key())
+        self.assertEqual(q.max_items, 1)
+        attempt = self._start()
+        page = self.client.get(reverse('attempt', args=[attempt.pk]))
+        item = next(i for i in page.context['payload']['questions'] if i['id'] == q.pk)
+        self.assertFalse(item['two_parts'])
+        self._answer(attempt, question=q.pk, value_a='7')
+        self.client.post(reverse('attempt_finish', args=[attempt.pk]))
+        attempt.refresh_from_db()
+        self.assertEqual(attempt.total_items, 5)  # yopiq 1, moslashtirish 1, a/b 2, bitta javobli 1
+        self.assertEqual(attempt.correct_items, 1)
+        answer = attempt.answers.get(question=q)
+        self.assertTrue(answer.correct_a)
+        self.assertFalse(answer.correct_b)
+        page = self.client.get(reverse('attempt_result', args=[attempt.pk]))
+        self.assertNotContains(page, 'b) Javobingiz: <b>—</b> <span class="muted">· to&#x27;g&#x27;ri: 5')
 
     def test_exam_is_reachable_only_by_code(self):
         page = self.client.get(reverse('exam_list'))
