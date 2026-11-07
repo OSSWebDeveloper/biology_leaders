@@ -12,7 +12,7 @@ from .models import Answer, Attempt, Exam, Question
 from .pdf_import import PdfImportError, slice_pdf, strip_key_pages
 from .scoring import grade_attempt
 
-DEFAULT_SHEET = {'mcq': 32, 'matching': 3, 'open': 0}
+DEFAULT_SHEET = {'mcq': 32, 'matching': 3, 'open': 10}
 DEFAULT_QUESTION_COUNT = sum(DEFAULT_SHEET.values())
 
 

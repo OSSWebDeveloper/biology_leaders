@@ -1,5 +1,9 @@
 # Versiyalar tarixi
 
+## 1.4.2 — 2026-11-08
+
+Boshlang'ich tuzilish: 32 ta 4 variantli, 3 ta 6 variantli, 10 ta yozma
+
 ## 1.4.1 — 2026-11-08
 
 Test tekshiruvi tuzatildi
