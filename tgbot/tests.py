@@ -16,7 +16,7 @@ from django.utils import timezone
 from accounts.models import StudyGroup, User
 from exams.models import Exam
 from tgbot.handlers import router
-from tgbot.teacher_handlers import BTN_NEW, parse_key_lines, parse_times
+from tgbot.teacher_handlers import BTN_LAUNCH, BTN_NEW, parse_key_lines, parse_times
 from tgbot.teacher_handlers import router as teacher_router
 
 TG_ID = 5001
@@ -206,11 +206,8 @@ class TeacherBotTests(TransactionTestCase):
         self.press('count:+')
         self.press('count:ok')
         self.assertEqual(exam.questions.count(), 36)
-        self.send('Matematika 8-noyabr')
-        self.assertIn('Tugash vaqti', self.send('08.11.2030 12:00\n08.11.2030 09:00')[0])
-        self.assertIn('36 2√5', self.send('08.11.2030 09:00\n08.11.2030 10:00')[0])
-        exam.refresh_from_db()
-        self.assertEqual((exam.title, exam.duration_min), ('Matematika 8-noyabr', 60))
+        # nomdan keyin vaqt emas, javoblar so'raladi
+        self.assertIn('36 2√5', self.send('Matematika 8-noyabr')[0])
 
         # bo'lib yuborish va xato qator
         lines = [f'{n} A' for n in range(1, 33)] + [f'{n} F' for n in range(33, 36)]
@@ -218,12 +215,29 @@ class TeacherBotTests(TransactionTestCase):
         self.assertIn('36: a) va b)', replies[0])
         self.assertIn('1: A–D', replies[0])
         self.assertIn('99:', replies[0])
+        self.assertEqual(self.send(BTN_LAUNCH), ["Joriy etishga tayyor test yo'q. Avval yangi test yarating."])
+
+        # menyuga chiqib ketganda test va javoblar yo'qolmaydi, /kalit bilan davom etadi
+        self.assertTrue(Exam.objects.filter(pk=exam.pk).exists())
+        self.assertIn('Javoblarni', self.send(f'/kalit {exam.access_code}')[0])
+        replies = self.send('36 2√5; 16/3')
+        self.assertIn('✅ Test saqlandi.', replies)
         exam.refresh_from_db()
         self.assertFalse(exam.is_published)
+        self.assertIsNone(exam.opens_at)
+        self.assertFalse(any(isinstance(m, SendDocument) for m in self.session.sent))
+        self.assertEqual(self.session.sent[-1].reply_markup.inline_keyboard[0][0].callback_data, f'launch:{exam.pk}')
+
+        # joriy etish: ro'yxatdan tanlash, vaqt, tayyor xabar
+        self.send(BTN_LAUNCH)
+        self.assertEqual(self.session.sent[-1].reply_markup.inline_keyboard[0][0].callback_data, f'launch:{exam.pk}')
+        self.assertIn('ikki qatorda', self.press(f'launch:{exam.pk}')[-1])
+        self.assertIn('Tugash vaqti', self.send('08.11.2030 12:00\n08.11.2030 09:00')[0])
         self.session.sent.clear()
-        self.send('36 2√5; 16/3')
+        self.send('08.11.2030 09:00\n08.11.2030 10:00')
         exam.refresh_from_db()
         self.assertTrue(exam.is_published)
+        self.assertEqual(exam.duration_min, 60)
         document = next(m for m in self.session.sent if isinstance(m, SendDocument))
         self.assertIn(exam.access_code, document.caption)
         self.assertIn('08.11.2030 09:00', document.caption)
@@ -231,6 +245,10 @@ class TeacherBotTests(TransactionTestCase):
         self.assertIn('@biology_leaders_bot', document.caption)
         self.assertEqual(document.document.filename, 'Matematika_8-noyabr.docx')
         self.assertEqual(self.session.sent[-1].text, '☝️ Shu xabarni guruhga uzating.')
+
+        # saqlangan test /bekor bilan o'chib ketmaydi
+        self.send('/bekor')
+        self.assertTrue(Exam.objects.filter(pk=exam.pk).exists())
 
     def test_cancel_removes_draft(self):
         self.make_teacher()
@@ -240,6 +258,12 @@ class TeacherBotTests(TransactionTestCase):
         self.send('/bekor')
         self.assertFalse(Exam.objects.exists())
 
+    def test_leaving_before_count_removes_empty_draft(self):
+        self.make_teacher()
+        self.upload()
+        self.send('/start')
+        self.assertFalse(Exam.objects.exists())
+
     def test_cannot_touch_other_teachers_exam(self):
         self.make_teacher()
         other = User.objects.create(username='o', telegram_id=7, role='teacher')
@@ -247,3 +271,5 @@ class TeacherBotTests(TransactionTestCase):
         for command in ('natija', 'xabar', 'kalit'):
             self.assertIn('topilmadi', self.send(f'/{command} {exam.access_code}')[0])
         self.assertEqual(self.send('/testlar'), ["Hali test yo'q."])
+        self.assertEqual(self.press(f'launch:{exam.pk}'), ['Test topilmadi'])
+        self.assertEqual(self.press('launch:yomon'), ['Test topilmadi'])

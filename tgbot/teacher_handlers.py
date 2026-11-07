@@ -32,6 +32,7 @@ router = Router()
 
 BTN_NEW = '➕ Yangi test'
 BTN_LIST = '📋 Testlarim'
+BTN_LAUNCH = '🚀 Joriy etish'
 MAX_DOWNLOAD_MB = 20  # Bot API bundan kattasini yuklab bermaydi
 DEFAULT_DURATION_MIN = 150
 MIN_QUESTIONS, MAX_QUESTIONS = 1, 99
@@ -43,10 +44,14 @@ count_keyboard = InlineKeyboardMarkup(inline_keyboard=[[
 ]])
 
 menu = ReplyKeyboardMarkup(
-    keyboard=[[KeyboardButton(text=BTN_NEW), KeyboardButton(text=BTN_LIST)]], resize_keyboard=True)
+    keyboard=[[KeyboardButton(text=BTN_NEW), KeyboardButton(text=BTN_LAUNCH)], [KeyboardButton(text=BTN_LIST)]],
+    resize_keyboard=True)
 
-TIMES_HELP = ("Boshlanish va tugash vaqtini ikki qatorda yozing:\n\n"
-              "<code>08.11.2026 09:00\n08.11.2026 12:00</code>")
+
+def times_help():
+    tomorrow = timezone.localtime() + datetime.timedelta(days=1)
+    return ("Boshlanish va tugash vaqtini ikki qatorda yozing:\n\n"
+            f"<code>{tomorrow:%d.%m.%Y} 09:00\n{tomorrow:%d.%m.%Y} 12:00</code>")
 
 
 def keys_help(numbers):
@@ -71,8 +76,11 @@ class NewExam(StatesGroup):
     file = State()
     count = State()
     title = State()
-    times = State()
     keys = State()
+
+
+class Launch(StatesGroup):
+    times = State()
 
 
 class TeacherOnly(BaseMiddleware):
@@ -195,8 +203,10 @@ def _question_numbers(exam_id):
 
 
 @sync_to_async
-def _publish(exam_id):
-    Exam.objects.filter(pk=exam_id).update(status=Exam.Status.PUBLISHED)
+def _discard_if_empty(exam_id):
+    exam = Exam.objects.filter(pk=exam_id, status=Exam.Status.DRAFT).first()
+    if exam and not exam.questions.exists() and not exam.attempts.exists():
+        discard_exam(exam)
 
 
 @sync_to_async
@@ -210,6 +220,24 @@ def _discard_draft(exam_id):
 def _own_exam(teacher, code):
     exams = Exam.objects.all() if teacher.is_admin_role else Exam.objects.filter(created_by=teacher)
     return exams.filter(access_code=(code or '').strip().upper()).first()
+
+
+def _is_ready(exam):
+    return bool(exam.attachment) and exam.questions.exists() and not exam.missing_keys()
+
+
+@sync_to_async
+def _ready_exams(teacher):
+    """Joriy etsa bo'ladigan testlar: fayli bor va javoblari to'liq."""
+    exams = Exam.objects.all() if teacher.is_admin_role else Exam.objects.filter(created_by=teacher)
+    return [(exam.pk, exam.title) for exam in exams[:30] if _is_ready(exam)]
+
+
+@sync_to_async
+def _ready_exam(teacher, exam_id):
+    exams = Exam.objects.all() if teacher.is_admin_role else Exam.objects.filter(created_by=teacher)
+    exam = exams.filter(pk=exam_id).first()
+    return exam if exam and _is_ready(exam) else None
 
 
 @sync_to_async
@@ -255,9 +283,18 @@ async def _download(bot, document):
 
 
 async def _abandon_draft(state):
+    """Faqat /bekor uchun: yaratilayotgan test o'chiriladi."""
     data = await state.get_data()
     if data.get('creating') and data.get('exam_id'):
         await _discard_draft(data['exam_id'])
+    await state.clear()
+
+
+async def _leave_flow(state):
+    """Boshqa bo'limga o'tish: kiritilgan javoblar yo'qolmaydi, /kalit KOD bilan davom etsa bo'ladi."""
+    data = await state.get_data()
+    if data.get('creating') and data.get('exam_id'):
+        await _discard_if_empty(data['exam_id'])
     await state.clear()
 
 
@@ -279,11 +316,11 @@ def _format_missing(numbers):
 
 @router.message(CommandStart())
 async def cmd_start(message: Message, state: FSMContext, teacher):
-    await _abandon_draft(state)
+    await _leave_flow(state)
     await message.answer(
         f"Assalomu aleykum, {teacher.display_name}.\n\n"
-        "Yangi test: fayl yuborasiz, vaqtni va javoblarni qatorlar bilan yozasiz, "
-        "guruhga uzatish uchun tayyor xabar olasiz.\n\n"
+        "Yangi test: fayl, savollar soni, nom va javoblar.\n"
+        "Joriy etish: testni tanlaysiz, vaqtni yozasiz va guruhga uzatish uchun tayyor xabar olasiz.\n\n"
         "/testlar: testlarim\n/natija KOD: natijalar\n/xabar KOD: guruh xabarini qayta olish\n"
         "/kalit KOD: javoblarni o'zgartirish\n/bekor: bekor qilish",
         reply_markup=menu)
@@ -326,7 +363,7 @@ async def cmd_keys(message: Message, command: CommandObject, state: FSMContext, 
     if exam is None:
         await message.answer('Test topilmadi. Masalan: /kalit 7KM3QX')
         return
-    await _abandon_draft(state)
+    await _leave_flow(state)
     await state.set_state(NewExam.keys)
     await state.update_data(exam_id=exam.pk, creating=False, editing=exam.is_published)
     numbers = await _question_numbers(exam.pk)
@@ -335,9 +372,34 @@ async def cmd_keys(message: Message, command: CommandObject, state: FSMContext, 
 
 @router.message(F.text == BTN_NEW)
 async def new_exam(message: Message, state: FSMContext):
-    await _abandon_draft(state)
+    await _leave_flow(state)
     await state.set_state(NewExam.file)
     await message.answer('Test faylini yuboring (PDF yoki Word).')
+
+
+@router.message(F.text == BTN_LAUNCH)
+async def choose_exam(message: Message, state: FSMContext, teacher):
+    await _leave_flow(state)
+    exams = await _ready_exams(teacher)
+    if not exams:
+        await message.answer("Joriy etishga tayyor test yo'q. Avval yangi test yarating.", reply_markup=menu)
+        return
+    buttons = [[InlineKeyboardButton(text=title[:60], callback_data=f'launch:{pk}')] for pk, title in exams]
+    await message.answer('Qaysi testni joriy etasiz?', reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons))
+
+
+@router.callback_query(F.data.startswith('launch:'))
+async def launch_selected(callback: CallbackQuery, state: FSMContext, teacher):
+    pk = callback.data.split(':', 1)[1]
+    exam = await _ready_exam(teacher, int(pk)) if pk.isdigit() else None
+    if exam is None:
+        await callback.answer('Test topilmadi')
+        return
+    await _leave_flow(state)
+    await state.set_state(Launch.times)
+    await state.update_data(exam_id=exam.pk, creating=False)
+    await callback.answer()
+    await callback.message.answer(f'<b>{notify.esc(exam.title)}</b>\n\n{times_help()}', parse_mode='HTML')
 
 
 # ---------- Yangi test bosqichlari ----------
@@ -404,21 +466,6 @@ async def got_title(message: Message, state: FSMContext):
         return
     data = await state.get_data()
     await _set_fields(data['exam_id'], title=title)
-    await state.set_state(NewExam.times)
-    await message.answer(TIMES_HELP, parse_mode='HTML')
-
-
-@router.message(NewExam.times, F.text)
-async def got_times(message: Message, state: FSMContext):
-    try:
-        opens, closes = parse_times(message.text)
-    except ValueError as exc:
-        await message.answer(f'{exc}\n\n{TIMES_HELP}', parse_mode='HTML')
-        return
-    data = await state.get_data()
-    window = int((closes - opens).total_seconds() // 60)
-    await _set_fields(data['exam_id'], opens_at=opens, closes_at=closes,
-                      duration_min=max(1, min(DEFAULT_DURATION_MIN, window)))
     await state.set_state(NewExam.keys)
     await message.answer(keys_help(await _question_numbers(data['exam_id'])), parse_mode='HTML')
 
@@ -444,10 +491,27 @@ async def got_keys(message: Message, state: FSMContext):
 
 
 async def _finish(message, state, exam_id):
-    await _publish(exam_id)
+    """Test saqlanadi, lekin hali e'lon qilinmaydi: vaqt va kod joriy etishda."""
     await state.clear()
-    await message.answer("✅ Test e'lon qilindi.")
-    await _send_announcement(message, exam_id)
+    await message.answer('✅ Test saqlandi.', reply_markup=menu)
+    await message.answer('Guruhga berish vaqti kelganda joriy eting.', reply_markup=InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text=BTN_LAUNCH, callback_data=f'launch:{exam_id}')]]))
+
+
+@router.message(Launch.times, F.text)
+async def got_times(message: Message, state: FSMContext):
+    try:
+        opens, closes = parse_times(message.text)
+    except ValueError as exc:
+        await message.answer(f'{exc}\n\n{times_help()}', parse_mode='HTML')
+        return
+    data = await state.get_data()
+    window = int((closes - opens).total_seconds() // 60)
+    await _set_fields(data['exam_id'], opens_at=opens, closes_at=closes, status=Exam.Status.PUBLISHED,
+                      duration_min=max(1, min(DEFAULT_DURATION_MIN, window)))
+    await state.clear()
+    await message.answer('✅ Test joriy etildi.')
+    await _send_announcement(message, data['exam_id'])
 
 
 @router.message()

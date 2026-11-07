@@ -1,5 +1,12 @@
 # Versiyalar tarixi
 
+## 1.3.0 — 2026-11-07
+
+Test yaratish va joriy etish ajratildi
+
+- Vaqt faqat joriy etishda so'raladi, tayyor xabar shundan keyin chiqadi
+- Menyuga chiqib ketganda chala test va javoblar saqlanib qoladi
+
 ## 1.2.0 — 2026-11-07
 
 O'qituvchi boti faylni o'qimaydi, savollar soni tugmalar bilan
