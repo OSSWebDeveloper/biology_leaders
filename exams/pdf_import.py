@@ -256,7 +256,8 @@ def strip_key_pages(data):
         if key_line is None:
             continue
         number = page.number
-        before = [l for l in lines if l.y1 <= key_line.y0 and not l.text.isdigit()]
+        # sahifa sarlavhasi (yuqori 12%) savol hisoblanmaydi, aks holda bo'sh sahifa qoladi
+        before = [l for l in lines if page.rect.height * 0.12 < l.y0 and l.y1 <= key_line.y0 and not l.text.isdigit()]
         if before:  # sahifa boshida oxirgi savol bor: faqat jadval qismi o'chiriladi
             page.add_redact_annot(fitz.Rect(0, key_line.y0 - 2, page.rect.width, page.rect.height), fill=(1, 1, 1))
             page.apply_redactions()

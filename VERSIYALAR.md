@@ -1,5 +1,9 @@
 # Versiyalar tarixi
 
+## 1.1.1 — 2026-11-07
+
+Guruh nusxasida bo'sh sahifa qolmaydi
+
 ## 1.1.0 — 2026-11-07
 
 Testga faqat kod bilan kirish va o'qituvchi boti
