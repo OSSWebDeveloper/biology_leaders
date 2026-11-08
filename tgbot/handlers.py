@@ -179,5 +179,5 @@ async def cmd_help(message: Message):
     await message.answer(
         "Bot milliy sertifikat testlarini yechish uchun.\n\n"
         "/start — bosh menyu\n/natijalar — oxirgi natijalar\n/id — Telegram ID\n/panel — o'qituvchi uchun brauzer havolasi\n\n"
-        "Natija taxminiy: haqiqiy imtihon Rasch modeli bilan baholanadi."
+        "Natijalar Rasch modeli bilan baholanadi va guruhga tashlanadi."
     )

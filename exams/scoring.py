@@ -1,8 +1,7 @@
 """Javobni tekshirish va baholash.
 
-Haqiqiy imtihon Rasch modeli bilan baholanadi: u barcha ishtirokchilar natijasiga bog'liq va
-rasmiy spetsifikatsiyada savol turlari uchun aniq ball yo'q. Shu sabab bu yerda TAXMINIY ball:
-to'g'ri bandlar ulushi 75 ballik shkalaga o'tkaziladi (vaznlarni test sozlamasida o'zgartirsa bo'ladi).
+grade_attempt javoblarni tekshiradi va to'g'ri bandlar ulushini hisoblaydi. Yakuniy ball keyin
+services.rasch_rescore da Rasch modeli bilan, shu testni yechgan hamma bilan birga hisoblanadi.
 """
 import math
 import re

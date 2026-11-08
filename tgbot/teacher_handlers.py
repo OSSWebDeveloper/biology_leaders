@@ -85,7 +85,13 @@ class NewExam(StatesGroup):
 
 
 class Launch(StatesGroup):
+    code = State()
     times = State()
+
+
+CODE_PATTERN = re.compile(r'[A-Z0-9]{3,8}')
+CODE_HELP = ("Kirish kodini yozing: 3–8 ta lotin harfi yoki raqam.\n"
+             "Masalan: <code>BIO15</code>")
 
 
 class TeacherOnly(BaseMiddleware):
@@ -221,6 +227,18 @@ def _create_from_file(teacher, name, data):
 
 
 @sync_to_async
+def _set_code(exam_id, text):
+    """O'qituvchi bergan kirish kodini saqlaydi. Xato matni yoki None."""
+    code = text.strip().upper()
+    if not CODE_PATTERN.fullmatch(code):
+        return "Kod 3–8 ta lotin harfi yoki raqamdan iborat bo'lsin, bo'sh joysiz."
+    if Exam.objects.filter(access_code=code).exclude(pk=exam_id).exists():
+        return 'Bu kod boshqa testda band. Boshqasini yozing.'
+    Exam.objects.filter(pk=exam_id).update(access_code=code)
+    return None
+
+
+@sync_to_async
 def _create_questions(exam_id, counts):
     create_answer_sheet(Exam.objects.get(pk=exam_id), counts)
 
@@ -296,8 +314,9 @@ def _results_text(exam):
     average = exam.attempts.filter(finished_at__isnull=False).aggregate(a=Avg('score'))['a']
     lines = [f"<b>{notify.esc(exam.title)}</b>", f"Yechganlar: {len(attempts)} · o'rtacha ball: {average:.1f}", '']
     for index, attempt in enumerate(attempts, 1):
-        lines.append(f"{index}. {notify.esc(attempt.student.display_name)} — {attempt.score} ball, "
-                     f"{attempt.grade or 'darajasiz'} ({attempt.correct_items}/{attempt.total_items})")
+        grade = f", {attempt.grade}" if attempt.grade else ''
+        lines.append(f"{index}. {notify.esc(attempt.student.display_name)} — {attempt.score} ball{grade} "
+                     f"({attempt.correct_items}/{attempt.total_items})")
         if sum(map(len, lines)) > 3700:
             lines.append(f"… yana {len(attempts) - index} ta")
             break
@@ -348,7 +367,7 @@ async def cmd_start(message: Message, state: FSMContext, teacher):
     await message.answer(
         f"Assalomu aleykum, {teacher.display_name}.\n\n"
         "Yangi test: fayl, savollar soni, nom va javoblar.\n"
-        "Joriy etish: testni tanlaysiz, vaqtni yozasiz va guruhga uzatish uchun tayyor xabar olasiz.\n\n"
+        "Joriy etish: testni tanlaysiz, kirish kodi va vaqtni yozasiz va guruhga uzatish uchun tayyor xabar olasiz.\n\n"
         "/testlar: testlarim\n/natija KOD: natijalar\n/xabar KOD: guruh xabarini qayta olish\n"
         "/kalit KOD: javoblarni o'zgartirish\n/bekor: bekor qilish",
         reply_markup=menu)
@@ -437,10 +456,10 @@ async def launch_selected(callback: CallbackQuery, state: FSMContext, teacher):
         await callback.answer('Test topilmadi')
         return
     await _leave_flow(state)
-    await state.set_state(Launch.times)
+    await state.set_state(Launch.code)
     await state.update_data(exam_id=exam.pk, creating=False)
     await callback.answer()
-    await callback.message.answer(f'<b>{notify.esc(exam.title)}</b>\n\n{times_help()}', parse_mode='HTML')
+    await callback.message.answer(f'<b>{notify.esc(exam.title)}</b>\n\n{CODE_HELP}', parse_mode='HTML')
 
 
 # ---------- Yangi test bosqichlari ----------
@@ -619,6 +638,17 @@ async def _finish(message, state, exam_id):
     await message.answer('✅ Test saqlandi.', reply_markup=menu)
     await message.answer('Guruhga berish vaqti kelganda joriy eting.', reply_markup=InlineKeyboardMarkup(inline_keyboard=[[
         InlineKeyboardButton(text=BTN_LAUNCH, callback_data=f'launch:{exam_id}')]]))
+
+
+@router.message(Launch.code, F.text)
+async def got_code(message: Message, state: FSMContext):
+    data = await state.get_data()
+    error = await _set_code(data['exam_id'], message.text)
+    if error:
+        await message.answer(f'{error}\n\n{CODE_HELP}', parse_mode='HTML')
+        return
+    await state.set_state(Launch.times)
+    await message.answer(f'Kirish kodi: <code>{message.text.strip().upper()}</code>\n\n{times_help()}', parse_mode='HTML')
 
 
 @router.message(Launch.times, F.text)

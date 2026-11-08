@@ -10,7 +10,8 @@ from tgbot import notify
 
 from .models import Answer, Attempt, Exam, Question
 from .pdf_import import PdfImportError, slice_pdf, strip_key_pages
-from .scoring import grade_attempt
+from . import rasch
+from .scoring import grade_attempt, grade_for
 
 DEFAULT_SHEET = {'mcq': 32, 'matching': 3, 'open': 10}
 DEFAULT_QUESTION_COUNT = sum(DEFAULT_SHEET.values())
@@ -63,6 +64,7 @@ def finalize(attempt):
     if not claimed:
         return attempt
     grade_attempt(attempt)
+    rasch_rescore(attempt.exam)
     notify.attempt_result(attempt)
     return attempt
 
@@ -80,6 +82,29 @@ def finish_expired():
 def regrade_exam(exam):
     for attempt in exam.attempts.filter(finished_at__isnull=False).prefetch_related('answers'):
         grade_attempt(attempt)
+    rasch_rescore(exam)
+
+
+def rasch_rescore(exam):
+    """Shu testni yakunlagan hammaning ballini Rasch modeli bilan qayta hisoblaydi.
+
+    Ball boshqalar natijasiga bog'liq: har yangi yakunlangan urinishdan keyin hammasi yangilanadi.
+    """
+    items = [(q.pk, part) for q in exam.questions.all() if q.has_key()
+             for part in (('a', 'b') if q.max_items == 2 else ('a',))]
+    attempts = list(exam.attempts.filter(finished_at__isnull=False).prefetch_related('answers'))
+    if not attempts:
+        return
+    responses = []
+    for attempt in attempts:
+        answers = {a.question_id: a for a in attempt.answers.all()}
+        responses.append([int(bool(answers.get(pk) and getattr(answers[pk], 'correct_' + part)))
+                          for pk, part in items])
+    thetas, _ = rasch.estimate(responses)
+    for attempt, score in zip(attempts, rasch.t_scores(thetas)):
+        attempt.score = score
+        attempt.grade = grade_for(score)
+    Attempt.objects.bulk_update(attempts, ['score', 'grade'])
 
 
 def save_answer(attempt, question, choice=None, value_a=None, value_b=None):

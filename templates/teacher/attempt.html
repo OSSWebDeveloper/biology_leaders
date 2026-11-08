@@ -2,7 +2,7 @@
 {% block title %}{{ attempt.student.display_name }}{% endblock %}
 {% block content %}
 <h1>{{ attempt.student.display_name }}</h1>
-<p class="muted">{{ exam.title }} · {{ attempt.score }} ball · {{ attempt.grade|default:"darajasiz" }} · {{ attempt.correct_items }}/{{ attempt.total_items }}</p>
+<p class="muted">{{ exam.title }} · {{ attempt.score }} ball ·{% if attempt.grade %} {{ attempt.grade }} ·{% endif %} {{ attempt.correct_items }}/{{ attempt.total_items }}</p>
 <div class="card"><div class="num-grid mb0">{% for r in rows %}<a class="num {{ r.state }}" href="#s{{ r.q.number }}">{{ r.q.number }}</a>{% endfor %}</div></div>
 {% for row in rows %}
 <div class="card review {{ row.state }}" id="s{{ row.q.number }}">

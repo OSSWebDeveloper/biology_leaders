@@ -1,5 +1,13 @@
 # Versiyalar tarixi
 
+## 1.7.0 — 2026-11-08
+
+Rasch modeli bilan baholash, kirish kodini o'qituvchi beradi
+
+- Ball Rasch modeli (JML) bilan shu testni yechgan hamma bo'yicha hisoblanadi, T = 50 + 10*Z, 75 gacha; har yakunlangan urinishdan keyin hammasi qayta hisoblanadi
+- Joriy etishda bot avval kirish kodini so'raydi: 3-8 lotin harfi yoki raqam, band kod qabul qilinmaydi
+- O'qituvchi natijalarida 'darajasiz' yozuvi olib tashlandi
+
 ## 1.6.0 — 2026-11-08
 
 Javoblar varag'i bitta sahifada, o'quvchiga ball ko'rsatilmaydi

@@ -23,6 +23,39 @@ from .services import finish_expired
 TOKEN = '123:TEST'
 
 
+class RaschTests(TestCase):
+    # 6 o'quvchi, 5 savol: 1-savol eng oson, 5-savol eng qiyin
+    RESPONSES = [
+        [1, 1, 1, 1, 1],
+        [1, 1, 1, 1, 0],
+        [1, 1, 1, 0, 0],
+        [1, 1, 0, 1, 0],
+        [1, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0],
+    ]
+
+    def test_more_correct_means_higher_score(self):
+        from .rasch import estimate, t_scores
+        thetas, difficulties = estimate(self.RESPONSES)
+        scores = t_scores(thetas)
+        self.assertEqual(scores, sorted(scores, reverse=True))
+        self.assertGreater(scores[0], scores[1])
+        self.assertGreater(scores[4], scores[5])
+        # bir xil xom ball: bir xil Rasch ball
+        self.assertEqual(scores[2], scores[3])
+        # kam o'quvchi yechgan savol qiyinroq
+        self.assertLess(difficulties[0], difficulties[1])
+        self.assertLess(difficulties[3], difficulties[4])
+        self.assertTrue(all(0 <= s <= 75 for s in scores))
+        self.assertAlmostEqual(sum(scores) / len(scores), 50, delta=1)
+
+    def test_degenerate_cases(self):
+        from .rasch import estimate, t_scores
+        self.assertEqual(t_scores(estimate([[1, 0, 1]])[0]), [50])
+        self.assertEqual(t_scores(estimate([[1, 1], [1, 1]])[0]), [50, 50])
+        self.assertEqual(t_scores([]), [])
+
+
 def signed_init_data(user_id=777, token=TOKEN, auth_date=None):
     fields = {'auth_date': str(auth_date or int(time.time())), 'query_id': 'q',
               'user': json.dumps({'id': user_id, 'first_name': 'Ali'})}
@@ -151,8 +184,8 @@ class FlowTests(TestCase):
         attempt.refresh_from_db()
         self.assertEqual((attempt.correct_items, attempt.total_items), (2, 4))
         self.assertEqual(attempt.percent, 50)
-        self.assertEqual(attempt.score, 37.5)
-        self.assertEqual(attempt.grade, '')
+        self.assertEqual(attempt.score, 50)  # Rasch: yagona ishtirokchi o'rtachada, T = 50
+        self.assertEqual(attempt.grade, 'C+')
         self.assertEqual(self.client.get(reverse('attempt_result', args=[attempt.pk])).status_code, 200)
         self.assertEqual(self._answer(attempt, question=self.q1.pk, choice='A').status_code, 409)
 

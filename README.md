@@ -13,9 +13,11 @@ Telegram bot (aiogram 3) va Web App (Django). Rollar: o'quvchi, o'qituvchi, admi
 Jami 45 topshiriq, 55 band, 150 daqiqa, 75 ballik shkala.
 Daraja: A+ 70, A 65, B+ 60, B 55, C+ 50, C 46.
 
-**Ball taxminiy.** Haqiqiy imtihon Rasch modeli bilan baholanadi, u barcha ishtirokchilar natijasiga
-bog'liq. Bu yerda ball = to'g'ri bandlar ulushi × 75. Vaznlarni test sozlamasida o'zgartirsa bo'ladi
-(`exams/scoring.py`).
+**Ball Rasch modeli bilan** (`exams/rasch.py`). Savol qiyinligi va o'quvchi qobiliyati shu testni
+yechganlarning hammasi bo'yicha birga baholanadi (JML), keyin T = 50 + 10·Z ballga o'tkaziladi va
+75 bilan cheklanadi. Ball boshqalar natijasiga bog'liq: har yangi yakunlangan urinishdan keyin hamma
+uchun qayta hisoblanadi. O'quvchiga ball ko'rsatilmaydi, natijani o'qituvchi guruhga tashlaydi.
+Savol vaznlari Rasch ballga ta'sir qilmaydi.
 
 ## Ishga tushirish
 
