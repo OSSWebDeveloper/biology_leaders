@@ -215,8 +215,6 @@ class FlowTests(TestCase):
         answer = attempt.answers.get(question=q)
         self.assertTrue(answer.correct_a)
         self.assertFalse(answer.correct_b)
-        page = self.client.get(reverse('attempt_result', args=[attempt.pk]))
-        self.assertNotContains(page, 'b) Javobingiz: <b>—</b> <span class="muted">· to&#x27;g&#x27;ri: 5')
 
     def test_exam_is_reachable_only_by_code(self):
         page = self.client.get(reverse('exam_list'))
@@ -243,20 +241,20 @@ class FlowTests(TestCase):
         self.client.post(reverse('attempt_start', args=[self.exam.access_code]))
         self.assertFalse(Attempt.objects.exists())
 
-    def test_answers_hidden_until_exam_closes(self):
-        Exam.objects.filter(pk=self.exam.pk).update(closes_at=timezone.now() + timedelta(hours=1), show_answers=True)
+    def test_student_sees_no_score(self):
         attempt = self._start()
         self.client.post(reverse('attempt_finish', args=[attempt.pk]))
-        page = self.client.get(reverse('attempt_result', args=[attempt.pk]))
-        self.assertFalse(page.context['show_answers'])
-        self.assertContains(page, 'test tugagach')
-        Exam.objects.filter(pk=self.exam.pk).update(closes_at=timezone.now() - timedelta(minutes=1))
-        self.assertTrue(self.client.get(reverse('attempt_result', args=[attempt.pk])).context['show_answers'])
+        attempt.refresh_from_db()
+        for page in (self.client.get(reverse('attempt_result', args=[attempt.pk])),
+                     self.client.get(reverse('my_results')),
+                     self.client.get(reverse('exam_detail', args=[self.exam.access_code]))):
+            self.assertContains(page, 'Natijalar guruhga tashlanadi')
+            self.assertNotContains(page, 'ball')
+            self.assertNotContains(page, 'Javobingiz')
 
-    def test_leaderboard_needs_attempt(self):
-        self.assertEqual(self.client.get(reverse('leaderboard', args=[self.exam.pk])).status_code, 404)
+    def test_leaderboard_only_for_teacher(self):
         self._start()
-        self.assertEqual(self.client.get(reverse('leaderboard', args=[self.exam.pk])).status_code, 200)
+        self.assertEqual(self.client.get(reverse('leaderboard', args=[self.exam.pk])).status_code, 404)
 
     def test_closed_window(self):
         Exam.objects.filter(pk=self.exam.pk).update(closes_at=timezone.now() - timedelta(minutes=1))

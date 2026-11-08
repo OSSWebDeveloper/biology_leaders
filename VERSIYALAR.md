@@ -1,5 +1,13 @@
 # Versiyalar tarixi
 
+## 1.6.0 — 2026-11-08
+
+Javoblar varag'i bitta sahifada, o'quvchiga ball ko'rsatilmaydi
+
+- Savollar faylda bo'lsa hamma savol bitta varaqda: 4 va 6 variantli harf tugmalari, yozma javob maydonlari
+- Natija sahifasi, Natijalarim, bot xabari va reytingda o'quvchiga ball va daraja ko'rsatilmaydi: 'Natijalar guruhga tashlanadi'
+- CSS va JS fayllariga versiya qo'shildi: Telegram eski faylni keshdan olmaydi
+
 ## 1.5.0 — 2026-11-08
 
 Kalit uch bosqichda, yozma savolga bitta javob va or

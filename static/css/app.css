@@ -132,6 +132,19 @@ table.t tr:last-child td { border-bottom: 0; }
 .exam-bottom { position: fixed; inset: auto 0 0 0; z-index: 15; display: flex; gap: 8px; padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); background: var(--card); border-top: 1px solid var(--line); }
 .exam-bottom .btn { flex: 1; }
 .exam-bottom .btn.grid-btn { flex: 0 0 56px; padding: 0; }
+.exam-bottom [hidden] { display: none; }
+
+/* Javoblar varag'i: hamma savol bitta sahifada */
+.answer-sheet { padding-left: 10px; padding-right: 10px; }
+.sec-gap { height: 18px; }
+.answer-sheet .row { display: flex; align-items: center; gap: 8px; padding: 4px 0; border-bottom: 1px solid var(--line); }
+.row-num { flex: 0 0 30px; font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; color: var(--muted); }
+.answer-sheet .opts { flex: 1; margin-top: 0; gap: 6px; }
+.answer-sheet .opt { min-height: 40px; border-radius: 10px; font-size: 15px; }
+.answer-sheet .opts.six .opt { font-size: 14px; }
+.row-inputs { flex: 1; display: flex; gap: 6px; }
+.row-inputs input { flex: 1; min-width: 0; }
+.sheet-keys { position: sticky; top: 50px; z-index: 5; margin: 0 0 4px; padding: 6px 0; background: var(--bg); }
 
 /* Savollar to'ri */
 .sheet { position: fixed; inset: 0; z-index: 30; display: none; background: rgb(0 0 0 / .45); }

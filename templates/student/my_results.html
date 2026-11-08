@@ -2,12 +2,12 @@
 {% block title %}Natijalarim{% endblock %}
 {% block content %}
 <h1>Natijalarim</h1>
+<p class="muted small">Natijalar guruhga tashlanadi.</p>
 {% for a in attempts %}
 <a class="card link" href="{% url 'attempt_result' a.pk %}">
   <div class="row between">
     <div class="grow"><div class="title">{{ a.exam.title }}</div>
-    <div class="muted small">{{ a.finished_at|date:"d.m.Y H:i" }} · {{ a.correct_items }}/{{ a.total_items }} to'g'ri</div></div>
-    <div class="right"><span class="grade">{{ a.grade|default:"—" }}</span><div class="muted small">{{ a.score }} ball</div></div>
+    <div class="muted small">{{ a.finished_at|date:"d.m.Y H:i" }} · yakunlandi</div></div>
   </div>
 </a>
 {% empty %}<div class="card empty-state">Hali yakunlangan testingiz yo'q.</div>{% endfor %}

@@ -9,6 +9,7 @@ from aiogram.types import (
 from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.urls import reverse
+from django.utils import timezone
 
 from accounts.models import StudyGroup, User
 from accounts.services import get_or_create_tg_user, make_login_token
@@ -77,7 +78,7 @@ def _save_fields(user, **fields):
 def _recent_results(user):
     attempts = (Attempt.objects.filter(student=user, finished_at__isnull=False)
                 .select_related('exam').order_by('-finished_at')[:5])
-    return [(a.exam.title, a.correct_items, a.total_items, a.score, a.grade) for a in attempts]
+    return [(a.exam.title, timezone.localtime(a.finished_at)) for a in attempts]
 
 
 @router.message(CommandStart())
@@ -146,10 +147,11 @@ async def cmd_results(message: Message):
     if not rows:
         await message.answer("Hali yakunlangan testingiz yo'q.")
         return
-    lines = ['<b>Oxirgi natijalar</b>']
-    for title, correct, total, score, grade in rows:
+    lines = ['<b>Yakunlangan testlaringiz</b>']
+    for title, finished in rows:
         title = title.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
-        lines.append(f"\n{title}\n{correct}/{total} · {score} ball · {grade or 'darajasiz'}")
+        lines.append(f"\n{title} · {finished:%d.%m.%Y %H:%M}")
+    lines.append('\nNatijalar guruhga tashlanadi.')
     await message.answer('\n'.join(lines), parse_mode='HTML')
 
 

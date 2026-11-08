@@ -1,36 +1,9 @@
 {% extends "base.html" %}
-{% block title %}Natija{% endblock %}
+{% block title %}Test yakunlandi{% endblock %}
 {% block content %}
 <h1>{{ exam.title }}</h1>
 <div class="card hero">
-  <div class="score">{{ attempt.score }}</div>
-  <div class="muted">75 balldan (taxminiy)</div>
-  <p class="mt mb0"><span class="grade">{{ attempt.grade|default:"—" }}</span></p>
-  <p class="muted small mt mb0">To'g'ri: {{ attempt.correct_items }} / {{ attempt.total_items }} · {{ attempt.percent }}% · {{ attempt.spent_minutes }} daqiqa</p>
-  {% if not attempt.grade %}<p class="small mt mb0">C daraja uchun kamida 46 ball kerak.</p>{% endif %}
+  <p class="title mb0">✅ Test yakunlandi</p>
+  <p class="mt mb0">Natijalar guruhga tashlanadi.</p>
 </div>
-<div class="card">
-  <h2>Bo'limlar</h2>
-  {% for s in sections %}{% if s.total %}
-  <div class="mt"><div class="row between small"><span>{{ s.label }}</span><b>{{ s.hit }} / {{ s.total }}</b></div>
-  <div class="bar"><i style="width:{% widthratio s.hit s.total 100 %}%"></i></div></div>
-  {% endif %}{% endfor %}
-</div>
-<div class="card">
-  <h2>Javoblar xaritasi</h2>
-  <div class="num-grid mb0">
-    {% for r in rows %}<a class="num {{ r.state }}" href="#s{{ r.q.number }}">{{ r.q.number }}</a>{% endfor %}
-  </div>
-</div>
-<h2>Savollar tahlili</h2>
-{% for row in rows %}
-<div class="card review {{ row.state }}" id="s{{ row.q.number }}">
-  <div class="title">{{ row.q.number }}-savol</div>
-  {% if row.q.text %}<div class="qtext">{{ row.q.text }}</div>{% endif %}
-  {% if row.q.image %}<img class="qimg" loading="lazy" width="{{ row.q.image.width }}" height="{{ row.q.image.height }}" src="{{ row.q.image.url }}" alt="{{ row.q.number }}-savol sharti">{% endif %}
-  {% include "student/_answer.html" with row=row show=show_answers %}
-</div>
-{% endfor %}
-{% if answers_later %}<p class="muted small">To'g'ri javoblar test tugagach ko'rinadi ({{ exam.closes_at|date:"d.m.Y H:i" }}).</p>{% endif %}
-<a class="btn ghost block" href="{% url 'exam_detail' exam.access_code %}">Test sahifasiga qaytish</a>
 {% endblock %}

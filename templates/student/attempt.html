@@ -31,4 +31,4 @@
 </div>
 {{ payload|json_script:"exam-data" }}
 {% endblock %}
-{% block scripts %}<script src="{% static 'js/attempt.js' %}"></script>{% endblock %}
+{% block scripts %}<script src="{% static 'js/attempt.js' %}?v={{ APP_VERSION }}"></script>{% endblock %}

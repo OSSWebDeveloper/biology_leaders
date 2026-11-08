@@ -190,6 +190,80 @@
     });
   }
 
+  // ---------- Javoblar varag'i: savollar faylda bo'lsa hammasi bitta sahifada ----------
+  const sheetMode = questions.every(q => !q.text && !q.image);
+
+  function renderSheet() {
+    let html = '';
+    let kind = null;
+    questions.forEach((q, i) => {
+      if (q.kind !== kind) {
+        if (kind) html += '<div class="sec-gap"></div>';
+        kind = q.kind;
+        if (kind === 'open') {
+          html += '<div class="keys sheet-keys" id="keys">' + ['√', 'π', '/', '-', ','].map(k => `<button type="button" data-k="${k}">${k}</button>`).join('') + '</div>';
+        }
+      }
+      html += `<div class="row" data-i="${i}"><span class="row-num">${q.number}</span>`;
+      if (q.kind === 'open') {
+        html += '<div class="row-inputs">' + (q.two_parts ? ['a', 'b'] : ['a']).map(name =>
+          `<input data-part="${name}" value="${esc(q['value_' + name]).replace(/"/g, '&quot;')}" maxlength="64" placeholder="${q.two_parts ? name + ')' : 'javob'}"
+            aria-label="${q.number}-savol ${q.two_parts ? name + ') ' : ''}javobi" autocomplete="off" autocapitalize="off" spellcheck="false">`).join('') + '</div>';
+      } else {
+        html += `<div class="opts ${q.letters.length > 4 ? 'six' : ''}">` + [...q.letters].map(letter =>
+          `<button type="button" class="opt ${q.choice === letter ? 'on' : ''}" data-v="${letter}" aria-pressed="${q.choice === letter}" aria-label="${q.number}-savol ${letter}">${letter}</button>`).join('') + '</div>';
+      }
+      html += '</div>';
+    });
+    const body = $('q-body');
+    body.classList.add('answer-sheet');
+    body.innerHTML = html;
+    body.querySelectorAll('.row').forEach(row => bindRow(row, questions[Number(row.dataset.i)]));
+
+    let lastInput = body.querySelector('input[data-part]');
+    body.addEventListener('focusin', e => { if (e.target.matches('input[data-part]')) lastInput = e.target; });
+    const keys = $('keys');
+    if (keys) {
+      keys.addEventListener('mousedown', e => e.preventDefault());
+      keys.addEventListener('click', event => {
+        const key = event.target.dataset.k;
+        if (!key || !lastInput) return;
+        const start = lastInput.selectionStart ?? lastInput.value.length;
+        const end = lastInput.selectionEnd ?? start;
+        lastInput.setRangeText(key, start, end, 'end');
+        lastInput.focus();
+        lastInput.dispatchEvent(new Event('input'));
+      });
+    }
+    $('prev').hidden = true;
+    $('grid-btn').hidden = true;
+    $('next').textContent = 'Testni yakunlash';
+  }
+
+  function bindRow(row, q) {
+    row.querySelectorAll('.opt').forEach(button => button.addEventListener('click', () => {
+      q.choice = q.choice === button.dataset.v ? '' : button.dataset.v;
+      row.querySelectorAll('.opt').forEach(b => {
+        const on = b.dataset.v === q.choice;
+        b.classList.toggle('on', on);
+        b.setAttribute('aria-pressed', on);
+      });
+      if (tg && tg.HapticFeedback && tg.isVersionAtLeast('6.1')) tg.HapticFeedback.selectionChanged();
+      queue(q);
+      drawGrid();
+    }));
+    let timerId;
+    row.querySelectorAll('input[data-part]').forEach(input => {
+      input.addEventListener('input', () => {
+        q['value_' + input.dataset.part] = input.value.trim();
+        clearTimeout(timerId);
+        timerId = setTimeout(() => queue(q), 500);
+        drawGrid();
+      });
+      input.addEventListener('blur', () => { clearTimeout(timerId); queue(q); });
+    });
+  }
+
   // ---------- Savollar to'ri ----------
   const sheet = $('sheet');
 
@@ -219,7 +293,8 @@
   $('zoom-close').addEventListener('click', () => $('zoom').classList.remove('open'));
   $('prev').addEventListener('click', () => index > 0 && go(index - 1));
   $('next').addEventListener('click', () => {
-    if (index < questions.length - 1) go(index + 1);
+    if (sheetMode) $('finish-btn').click();
+    else if (index < questions.length - 1) go(index + 1);
     else { drawGrid(); sheet.classList.add('open'); }
   });
   $('finish-btn').addEventListener('click', () => {
@@ -236,6 +311,6 @@
     });
   });
 
-  render();
+  if (sheetMode) renderSheet(); else render();
   drawGrid();
 })();

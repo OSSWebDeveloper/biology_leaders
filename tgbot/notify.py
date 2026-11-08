@@ -53,12 +53,8 @@ def attempt_result(attempt):
     student = attempt.student
     if not student.telegram_id:
         return
-    grade = attempt.grade or 'darajasiz'
-    text = (f"✅ <b>{esc(attempt.exam.title)}</b> yakunlandi\n\n"
-            f"To'g'ri: <b>{attempt.correct_items}</b> / {attempt.total_items}\n"
-            f"Taxminiy ball: <b>{attempt.score}</b> / 75\n"
-            f"Daraja: <b>{grade}</b>")
-    _background([(student.telegram_id, text, _open_button(f'/urinish/{attempt.pk}/natija/', "📊 Tahlilni ko'rish"))])
+    text = f"✅ <b>{esc(attempt.exam.title)}</b> yakunlandi.\n\nNatijalar guruhga tashlanadi."
+    _background([(student.telegram_id, text, None)])
 
 
 def announcement_caption(exam):

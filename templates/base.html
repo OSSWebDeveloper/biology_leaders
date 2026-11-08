@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>{% block title %}Milliy Sertifikat{% endblock %}</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<link rel="stylesheet" href="{% static 'css/app.css' %}">
+<link rel="stylesheet" href="{% static 'css/app.css' %}?v={{ APP_VERSION }}">
 {% block head %}{% endblock %}
 </head>
 <body data-tg-id="{{ user.telegram_id|default_if_none:'' }}">
@@ -24,7 +24,7 @@
 </nav>
 {% endif %}
 {% endblock %}
-<script src="{% static 'js/app.js' %}"></script>
+<script src="{% static 'js/app.js' %}?v={{ APP_VERSION }}"></script>
 {% block scripts %}{% endblock %}
 </body>
 </html>

@@ -24,16 +24,5 @@
 {% else %}
   <div class="msg">{{ reason }}</div>
 {% endif %}
-<p class="muted small mt">Natija taxminiy: haqiqiy imtihon Rasch modeli bilan baholanadi. Noto'g'ri javob uchun ball ayirilmaydi.</p>
-{% if attempts %}
-<div class="card mt">
-  <h2>Urinishlaringiz</h2>
-  <table class="t">
-    {% for a in attempts %}
-    <tr><td><a href="{% url 'attempt_result' a.pk %}">{{ a.finished_at|date:"d.m.Y H:i" }}</a></td><td>{{ a.correct_items }}/{{ a.total_items }}</td><td class="right"><b>{{ a.score }}</b> · {{ a.grade|default:"—" }}</td></tr>
-    {% endfor %}
-  </table>
-</div>
-{% endif %}
-{% if attempts or active %}<a class="btn ghost block mt" href="{% url 'leaderboard' exam.pk %}">🏆 Reyting</a>{% endif %}
+{% if attempts %}<p class="muted small mt">Siz bu testni {{ attempts.0.finished_at|date:"d.m.Y H:i" }} da yakunlagansiz. Natijalar guruhga tashlanadi.</p>{% endif %}
 {% endblock %}

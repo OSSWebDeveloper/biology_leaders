@@ -6,12 +6,10 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
-from django.utils import timezone
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_POST
 
 from .models import Attempt, Exam, Question
-from .scoring import GRADES
 from .services import can_start, exam_by_code, finalize, save_answer, start_attempt
 
 
@@ -55,7 +53,7 @@ def exam_list(request):
 @login_required
 def exam_detail(request, code):
     exam = _exam_for_code(code)
-    attempts = exam.attempts.filter(student=request.user, finished_at__isnull=False)
+    attempts = exam.attempts.filter(student=request.user, finished_at__isnull=False).order_by('-finished_at')
     active = exam.attempts.filter(student=request.user, finished_at__isnull=True).first()
     if active and active.seconds_left() <= 0:
         finalize(active)
@@ -132,26 +130,8 @@ def attempt_result(request, pk):
     attempt = _own_attempt(request, pk)
     if not attempt.is_finished:
         return redirect('attempt', pk=attempt.pk)
-    exam = attempt.exam
-    answers = {a.question_id: a for a in attempt.answers.all()}
-    rows = []
-    sections = {k: {'label': label, 'hit': 0, 'total': 0} for k, label in Question.Kind.choices}
-    for q in exam.questions.all():
-        a = answers.get(q.pk)
-        hits = (int(a.correct_a) + int(a.correct_b)) if a else 0
-        if q.has_key():
-            sections[q.kind]['hit'] += hits
-            sections[q.kind]['total'] += q.max_items
-        rows.append({'q': q, 'a': a, 'hits': hits,
-                     'state': 'empty' if not a or not a.is_answered else
-                              'ok' if hits == q.max_items else 'part' if hits else 'bad'})
-    # Test ochiq turganda javoblar ko'rsatilsa, ular guruhga tarqab ketadi
-    answers_later = exam.show_answers and bool(exam.closes_at) and timezone.now() < exam.closes_at
-    return render(request, 'student/result.html', {
-        'attempt': attempt, 'exam': exam, 'rows': rows, 'sections': sections.values(),
-        'grades': GRADES, 'show_answers': exam.show_answers and not answers_later,
-        'answers_later': answers_later, 'tab': 'results',
-    })
+    # Ball va tahlil o'quvchiga ko'rsatilmaydi: natijalarni o'qituvchi guruhga tashlaydi
+    return render(request, 'student/result.html', {'attempt': attempt, 'exam': attempt.exam, 'tab': 'results'})
 
 
 @login_required
@@ -165,7 +145,7 @@ def my_results(request):
 def leaderboard(request, pk):
     exam = get_object_or_404(Exam, pk=pk)
     is_owner = request.user.is_admin_role or (request.user.is_teacher and exam.created_by_id == request.user.pk)
-    if not is_owner and not exam.attempts.filter(student=request.user).exists():
+    if not is_owner:  # o'quvchilar natijani guruhdan biladi
         raise Http404
     best = {}
     for attempt in (exam.attempts.filter(finished_at__isnull=False).select_related('student')
