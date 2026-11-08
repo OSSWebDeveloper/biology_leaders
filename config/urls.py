@@ -7,5 +7,6 @@ urlpatterns = [
     path('django-admin/', admin.site.urls),
     path('', include('accounts.urls')),
     path('', include('exams.urls')),
-    re_path(r'^media/(?P<path>.*)$', serve, {'document_root': settings.MEDIA_ROOT}),
+    # questions/ ochiq emas: savol rasmlari exams.views.question_image orqali, ruxsat bilan
+    re_path(r'^media/(?P<path>(?!questions/).*)$', serve, {'document_root': settings.MEDIA_ROOT}),
 ]

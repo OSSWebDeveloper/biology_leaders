@@ -1,5 +1,14 @@
 # Versiyalar tarixi
 
+## 1.8.1 — 2026-11-08
+
+Ball tekshiruvi va savol rasmlari himoyasi tuzatildi
+
+- Yozma javob: 3,5 endi 3 deb o'qilmaydi (3,7 to'g'ri chiqmaydi); nisbat 9:3:3:1 bo'lish emas; 2c va 2n har xil javob
+- Rasch ajrata olmasa (bitta qatnashchi, hamma bir xil, hammasi 0 yoki hammasi to'g'ri) hammaga 50 o'rniga to'g'ri javoblar ulushidan ball
+- Savol rasmlari ochiq /media/ orqali berilmaydi: faqat test egasi, admin va testni boshlagan o'quvchi ko'radi
+- Obunasiz kelgan /start g_KOD havolasi Obuna bo'ldim bosilgach guruhga qo'shadi
+
 ## 1.8.0 — 2026-11-08
 
 Kanalga majburiy obuna

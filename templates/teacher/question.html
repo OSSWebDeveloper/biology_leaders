@@ -3,7 +3,7 @@
 {% block content %}
 <h1>{% if question.pk %}{{ question.number }}-savolni tahrirlash{% else %}Yangi savol{% endif %}</h1>
 <p class="muted">{{ exam.title }}</p>
-{% if question.image %}<div class="card"><img class="qimg" src="{{ question.image.url }}" alt="Joriy rasm"></div>{% endif %}
+{% if question.image %}<div class="card"><img class="qimg" src="{{ question.image_url }}" alt="Joriy rasm"></div>{% endif %}
 <form method="post" enctype="multipart/form-data" class="card form">{% csrf_token %}
   {{ form.as_div }}
   <button class="btn block">Saqlash</button>

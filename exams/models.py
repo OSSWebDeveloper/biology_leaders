@@ -108,6 +108,14 @@ class Question(models.Model):
         return f'{self.exam_id}/{self.number}'
 
     @property
+    def image_url(self):
+        """Rasm ochiq /media/ orqali emas, ruxsat tekshiradigan sahifa orqali beriladi."""
+        if not self.image:
+            return ''
+        from django.urls import reverse
+        return reverse('question_image', args=[self.pk])
+
+    @property
     def letters(self):
         return 'ABCDEF' if self.kind == self.Kind.MATCHING else 'ABCD'
 

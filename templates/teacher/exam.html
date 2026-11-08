@@ -34,7 +34,7 @@
     <div class="row between"><b>{{ q.number }}-savol</b>
       <span class="row"><span class="tag plain">{{ q.get_kind_display }}</span><a class="small" href="{% url 't_question' exam.pk q.pk %}">Tahrirlash</a></span></div>
     {% if q.text %}<div class="qtext">{{ q.text }}</div>{% endif %}
-    {% if q.image %}<img class="qimg" loading="lazy" width="{{ q.image.width }}" height="{{ q.image.height }}" src="{{ q.image.url }}" alt="{{ q.number }}-savol sharti">{% endif %}
+    {% if q.image %}<img class="qimg" loading="lazy" width="{{ q.image.width }}" height="{{ q.image.height }}" src="{{ q.image_url }}" alt="{{ q.number }}-savol sharti">{% endif %}
     {% if q.kind == 'open' %}
       {% if q.two_parts %}<div class="two">
         <div><label for="a{{ q.pk }}">a) javobi</label><input id="a{{ q.pk }}" name="a_{{ q.pk }}" value="{{ q.answer_a }}" autocomplete="off"></div>

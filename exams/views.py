@@ -6,7 +6,7 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
-from django.http import Http404, JsonResponse
+from django.http import FileResponse, Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.csrf import ensure_csrf_cookie
@@ -37,6 +37,24 @@ def channel_required(view):
                 'tab': 'tests'})
         return view(request, *args, **kwargs)
     return wrapper
+
+
+@login_required
+def question_image(request, pk):
+    """Savol rasmi: test egasi va admin yoki shu testni boshlagan o'quvchi ko'radi.
+
+    Rasm nomi taxmin qilinadigan (e5_1.png), shuning uchun ochiq /media/ orqali berilmaydi:
+    aks holda test ochilishidan oldin savollarni yuklab olish mumkin bo'lardi.
+    """
+    question = get_object_or_404(Question.objects.select_related('exam'), pk=pk)
+    user = request.user
+    allowed = (user.is_admin_role or question.exam.created_by_id == user.pk
+               or Attempt.objects.filter(exam_id=question.exam_id, student=user).exists())
+    if not allowed or not question.image:
+        raise Http404
+    response = FileResponse(question.image.open('rb'))  # turi fayl kengaytmasidan
+    response['Cache-Control'] = 'private, max-age=3600'
+    return response
 
 
 def _exam_for_code(code):
@@ -112,7 +130,7 @@ def attempt_view(request, pk):
         answer = saved.get(q.pk)
         questions.append({
             'id': q.pk, 'number': q.number, 'kind': q.kind, 'text': q.text,
-            'image': q.image.url if q.image else '', 'options': q.options, 'letters': q.letters,
+            'image': q.image_url, 'options': q.options, 'letters': q.letters,
             'part_a': q.part_a, 'part_b': q.part_b, 'two_parts': q.two_parts,
             'choice': answer.choice if answer else '',
             'value_a': answer.value_a if answer else '', 'value_b': answer.value_b if answer else '',

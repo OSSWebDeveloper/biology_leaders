@@ -65,6 +65,11 @@ class ChannelRequired(BaseMiddleware):
                 await event.answer()
                 await event.message.answer(subscription.SUBSCRIBE_TEXT, reply_markup=markup)
             return None
+        state = data.get('state')
+        text = event.text or ''
+        if state is not None and text.startswith('/start g_'):
+            # Guruh havolasi obunadan keyin ham ishlashi uchun: «Obuna bo'ldim» da qo'shiladi
+            await state.update_data(pending_group=text.split(maxsplit=1)[1][2:] if ' ' in text else '')
         await event.answer(subscription.SUBSCRIBE_TEXT, reply_markup=markup)
         return None
 
@@ -174,6 +179,14 @@ async def subscribed(callback: CallbackQuery, state: FSMContext):
     if not user.is_active:
         await callback.message.answer('Hisobingiz bloklangan.')
         return
+    code = (await state.get_data()).get('pending_group')
+    if code:
+        await state.update_data(pending_group=None)
+        group = await _join_group(user, code)
+        if group:
+            await callback.message.answer(f"✅ Siz «{group.name}» guruhiga qo'shildingiz.")
+        else:
+            await callback.message.answer("Guruh topilmadi: havola eskirgan bo'lishi mumkin.")
     if user.is_registered:
         await state.clear()
         await send_menu(callback.message, user)

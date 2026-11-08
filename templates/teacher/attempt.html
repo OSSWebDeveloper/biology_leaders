@@ -7,7 +7,7 @@
 {% for row in rows %}
 <div class="card review {{ row.state }}" id="s{{ row.q.number }}">
   <div class="title">{{ row.q.number }}-savol</div>
-  {% if row.q.image %}<img class="qimg" loading="lazy" width="{{ row.q.image.width }}" height="{{ row.q.image.height }}" src="{{ row.q.image.url }}" alt="{{ row.q.number }}-savol sharti">{% endif %}
+  {% if row.q.image %}<img class="qimg" loading="lazy" width="{{ row.q.image.width }}" height="{{ row.q.image.height }}" src="{{ row.q.image_url }}" alt="{{ row.q.number }}-savol sharti">{% endif %}
   {% include "student/_answer.html" with row=row show=True %}
 </div>
 {% endfor %}

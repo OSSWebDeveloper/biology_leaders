@@ -119,15 +119,26 @@ class _Parser:
 
 
 _APOSTROPHES = "'‘’ʻʼ`"
-_UNIT = re.compile(r'(?:[a-z%' + _APOSTROPHES + r'°]|\.)+\d?$')
+# Birlik harf bilan boshlanadi: «3,5» dagi «.5» birlik emas (aks holda 3,5 = 3 bo'lib qoladi)
+_UNIT = re.compile(r'[a-z%' + _APOSTROPHES + r'°][a-z%' + _APOSTROPHES + r'°.]*\d?$')
 
 
 def _clean(text):
     text = str(text).strip().lower()
-    for src, dst in (('−', '-'), ('–', '-'), ('—', '-'), ('×', '*'), ('·', '*'), ('⋅', '*'), (':', '/'),
+    for src, dst in (('−', '-'), ('–', '-'), ('—', '-'), ('×', '*'), ('·', '*'), ('⋅', '*'),
                      (',', '.'), ('÷', '/'), ('²', '^2'), ('³', '^3')):
         text = text.replace(src, dst)
     return re.sub(r'\s+', '', text)
+
+
+def _split_unit(cleaned):
+    """(son qismi, birlik): '20sm' -> ('20', 'sm'), '2n' -> ('2', 'n')."""
+    if cleaned.endswith(('pi', 'sqrt')):
+        return cleaned, ''
+    match = _UNIT.search(cleaned)
+    if not match:
+        return cleaned, ''
+    return cleaned[:match.start()], match.group()
 
 
 def parse_value(text):
@@ -135,8 +146,9 @@ def parse_value(text):
     text = _clean(text)
     if not text or len(text) > MAX_INPUT_LEN:
         return None
-    if not text.endswith(('pi', 'sqrt')):
-        text = _UNIT.sub('', text)  # birlik: 20 sm, 54 000 so'm, 3 ta
+    if ':' in text:
+        return None  # nisbat (9:3:3:1, 1:2:1) matn sifatida solishtiriladi
+    text, _ = _split_unit(text)
     try:
         value = _Parser(_tokenize(text)).parse()
     except (_ParseError, OverflowError, ZeroDivisionError, ValueError, TypeError, RecursionError):
@@ -154,6 +166,10 @@ def answers_match(given, key):
             continue
         key_value = parse_value(option)
         if given_value is not None and key_value is not None:
+            # Birlik yozilmasa ham bo'ladi (20 = 20 sm), lekin har xil birlik har xil javob: 2c ≠ 2n
+            given_unit, key_unit = _split_unit(_clean(given))[1], _split_unit(_clean(option))[1]
+            if given_unit and key_unit and given_unit != key_unit:
+                continue
             if abs(given_value - key_value) <= _TOLERANCE * max(1.0, abs(key_value)):
                 return True
         elif _clean(given) == _clean(option):

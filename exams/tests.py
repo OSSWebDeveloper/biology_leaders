@@ -90,6 +90,19 @@ class ScoringTests(TestCase):
                            ('__import__("os")', '1'), ('√-4', '2'), ('5.33', '16/3')]:
             self.assertFalse(answers_match(given, key), (given, key))
 
+    def test_decimals_ratios_and_units(self):
+        self.assertEqual(parse_value('3,5'), 3.5)
+        self.assertFalse(answers_match('3,7', '3,5'))  # avval «.5» birlik deb tashlanardi
+        self.assertFalse(answers_match('3', '3,5'))
+        self.assertTrue(answers_match('9 : 3 : 3 : 1', '9:3:3:1'))
+        self.assertFalse(answers_match('1:1', '9:3:3:1'))  # nisbat bo'lish emas
+        self.assertFalse(answers_match('3:1', '3'))
+        self.assertFalse(answers_match('2c', '2n'))
+        self.assertTrue(answers_match('2N', '2n'))
+        self.assertTrue(answers_match('1, 3, 5', '1,3,5'))
+        self.assertFalse(answers_match('1,3', '1,3,5'))
+        self.assertFalse(answers_match('20 kg', '20 sm'))
+
     def test_text_answer_and_alternatives(self):
         self.assertTrue(answers_match('(-∞;3]', '(-∞; 3]'))
         self.assertTrue(answers_match('7', '5|7'))
@@ -171,6 +184,41 @@ class FlowTests(TestCase):
         return self.client.post(reverse('attempt_answer', args=[attempt.pk]), json.dumps(body),
                                 content_type='application/json')
 
+    def test_extreme_students_not_all_fifty(self):
+        from .services import finalize, save_answer, start_attempt
+        best, worst = make_user(11), make_user(12)
+        for student, right in ((best, True), (worst, False)):
+            attempt = start_attempt(self.exam, student)
+            save_answer(attempt, self.q1, choice='B' if right else 'A')
+            save_answer(attempt, self.q2, choice='F' if right else 'A')
+            save_answer(attempt, self.q3, value_a='2√5' if right else '1', value_b='16/3' if right else '1')
+            finalize(attempt)
+        scores = dict(Attempt.objects.values_list('student_id', 'score'))
+        self.assertEqual((scores[best.pk], scores[worst.pk]), (75, 0))  # avval ikkalasi 50 (C+) olardi
+
+    def test_question_image_needs_access(self):
+        from django.core.files.base import ContentFile
+        media = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, media, ignore_errors=True)
+        with override_settings(MEDIA_ROOT=media):
+            self.q1.image.save('e1_1.png', ContentFile(b'PNG rasm'), save=True)
+            url = self.q1.image_url
+            self.assertEqual(self.client.get('/media/' + self.q1.image.name).status_code, 404)  # ochiq yo'l yopiq
+            self.assertEqual(self.client.get(url).status_code, 404)  # test boshlanmagan
+            attempt = self._start()
+            self.assertIn(url, json.dumps(self.client.get(reverse('attempt', args=[attempt.pk])).context['payload']))
+            response = self.client.get(url)
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(b''.join(response.streaming_content), b'PNG rasm')
+            self.client.logout()
+            self.assertEqual(self.client.get(url).status_code, 302)  # login so'raladi
+            owner = make_user(13, 'teacher')
+            Exam.objects.filter(pk=self.exam.pk).update(created_by=owner)
+            self.client.force_login(owner)
+            self.assertEqual(self.client.get(url).status_code, 200)
+            self.client.force_login(make_user(14, 'teacher'))  # boshqa o'qituvchi
+            self.assertEqual(self.client.get(url).status_code, 404)
+
     @override_settings(REQUIRED_CHANNEL_ID='-1001', REQUIRED_CHANNEL_URL='https://t.me/kanal')
     def test_channel_subscription_required(self):
         with patch('tgbot.subscription.is_subscribed', return_value=False) as check:
@@ -207,8 +255,9 @@ class FlowTests(TestCase):
         attempt.refresh_from_db()
         self.assertEqual((attempt.correct_items, attempt.total_items), (2, 4))
         self.assertEqual(attempt.percent, 50)
-        self.assertEqual(attempt.score, 50)  # Rasch: yagona ishtirokchi o'rtachada, T = 50
-        self.assertEqual(attempt.grade, 'C+')
+        # Rasch yagona ishtirokchini ajrata olmaydi: ball to'g'ri javoblar ulushidan (75 · 50%)
+        self.assertEqual(attempt.score, 37.5)
+        self.assertEqual(attempt.grade, '')
         self.assertEqual(self.client.get(reverse('attempt_result', args=[attempt.pk])).status_code, 200)
         self.assertEqual(self._answer(attempt, question=self.q1.pk, choice='A').status_code, 409)
 

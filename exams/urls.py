@@ -14,6 +14,7 @@ urlpatterns = [
     path('urinish/<int:pk>/yakunlash/', v.attempt_finish, name='attempt_finish'),
     path('urinish/<int:pk>/natija/', v.attempt_result, name='attempt_result'),
     path('natijalar/', v.my_results, name='my_results'),
+    path('savol/<int:pk>/rasm/', v.question_image, name='question_image'),
 
     path('oqituvchi/', t.t_exams, name='t_exams'),
     path('oqituvchi/test/yangi/', t.t_exam_new, name='t_exam_new'),

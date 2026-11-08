@@ -121,6 +121,20 @@ class BotTests(TransactionTestCase):
             texts = [getattr(m, 'text', None) for m in self.press('sub:check')]
             self.assertIn('Assalomu aleykum. Iltimos ism familyangizni kiring: Masalan : Behruz Hodiyev', texts)
 
+    @override_settings(REQUIRED_CHANNEL_ID='-1001', REQUIRED_CHANNEL_URL='https://t.me/kanal')
+    def test_group_invite_survives_subscription(self):
+        from tgbot.handlers import channel_required
+        channel_required.passed.clear()
+        teacher = User.objects.create(username='t', role='teacher')
+        group = StudyGroup.objects.create(name='B guruh', teacher=teacher)
+        with patch.object(type(channel_required), 'member', new=AsyncMock(return_value=False)):
+            self.send(f'/start g_{group.code}')
+        self.assertFalse(group.students.filter(telegram_id=TG_ID).exists())
+        with patch.object(type(channel_required), 'member', new=AsyncMock(return_value=True)):
+            texts = [getattr(m, 'text', None) for m in self.press('sub:check')]
+        self.assertTrue(any(t and 'B guruh' in t for t in texts), texts)
+        self.assertTrue(group.students.filter(telegram_id=TG_ID).exists())
+
     def test_results_empty_and_blocked(self):
         self.register()
         self.assertIn("yo'q", self.send('/natijalar')[0])

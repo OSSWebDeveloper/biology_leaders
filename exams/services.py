@@ -11,7 +11,7 @@ from tgbot import notify
 from .models import Answer, Attempt, Exam, Question
 from .pdf_import import PdfImportError, slice_pdf, strip_key_pages
 from . import rasch
-from .scoring import grade_attempt, grade_for
+from .scoring import SCALE_MAX, grade_attempt, grade_for
 
 DEFAULT_SHEET = {'mcq': 32, 'matching': 3, 'open': 10}
 DEFAULT_QUESTION_COUNT = sum(DEFAULT_SHEET.values())
@@ -100,8 +100,13 @@ def rasch_rescore(exam):
         answers = {a.question_id: a for a in attempt.answers.all()}
         responses.append([int(bool(answers.get(pk) and getattr(answers[pk], 'correct_' + part)))
                           for pk, part in items])
-    thetas, _ = rasch.estimate(responses)
-    for attempt, score in zip(attempts, rasch.t_scores(thetas)):
+    thetas, difficulties = rasch.estimate(responses)
+    scores = rasch.t_scores(thetas)
+    if difficulties is None or len(set(scores)) < 2:
+        # Rasch ajrata olmadi (bitta qatnashchi, hamma bir xil yoki hammasi 0/hammasi to'g'ri):
+        # hammaga 50 berish o'rniga to'g'ri javoblar ulushidan ball
+        scores = [round(SCALE_MAX * attempt.percent / 100, 1) for attempt in attempts]
+    for attempt, score in zip(attempts, scores):
         attempt.score = score
         attempt.grade = grade_for(score)
     Attempt.objects.bulk_update(attempts, ['score', 'grade'])
