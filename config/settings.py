@@ -1,5 +1,6 @@
 """Loyiha sozlamalari. Maxfiy qiymatlar .env faylidan olinadi (.env.example ga qarang)."""
 import os
+import sys
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -22,6 +23,11 @@ TEACHER_BOT_TOKEN = os.environ.get('TEACHER_BOT_TOKEN', '')
 WEBAPP_URL = os.environ.get('WEBAPP_URL', '').rstrip('/')
 ADMIN_TELEGRAM_IDS = {int(x) for x in _list('ADMIN_TELEGRAM_IDS')}
 WEBAPP_IS_HTTPS = WEBAPP_URL.startswith('https://')
+# Majburiy obuna: o'quvchi shu kanalga a'zo bo'lmasa bot va testlar ochilmaydi (bo'sh bo'lsa tekshirilmaydi)
+REQUIRED_CHANNEL_ID = os.environ.get('REQUIRED_CHANNEL_ID', '').strip()
+REQUIRED_CHANNEL_URL = os.environ.get('REQUIRED_CHANNEL_URL', '').strip()
+if sys.argv[1:2] == ['test']:  # testlar Telegram'ga so'rov yubormasin
+    REQUIRED_CHANNEL_ID = ''
 
 ALLOWED_HOSTS = ['localhost', '127.0.0.1', *_list('ALLOWED_HOSTS')]
 CSRF_TRUSTED_ORIGINS = _list('CSRF_TRUSTED_ORIGINS')

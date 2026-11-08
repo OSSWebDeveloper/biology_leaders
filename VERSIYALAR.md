@@ -1,5 +1,13 @@
 # Versiyalar tarixi
 
+## 1.8.0 — 2026-11-08
+
+Kanalga majburiy obuna
+
+- O'quvchi botdan foydalanishdan oldin kanalga obuna bo'lishi kerak: kanal havolasi va 'Obuna bo'ldim' tugmasi
+- Saytda ham kod kiritish va test boshlashda obuna tekshiriladi (menyu tugmasi botni chetlab o'tmasin)
+- Kanal .env da: REQUIRED_CHANNEL_ID, REQUIRED_CHANNEL_URL; Telegram javob bermasa test to'xtamaydi
+
 ## 1.7.0 — 2026-11-08
 
 Rasch modeli bilan baholash, kirish kodini o'qituvchi beradi

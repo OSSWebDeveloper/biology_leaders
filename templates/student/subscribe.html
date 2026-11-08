@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Kanalga obuna bo'ling{% endblock %}
+{% block content %}
+<h1>Kanalga obuna bo'ling</h1>
+<div class="card">
+  <p>Testlarni yechish uchun kanalimizga obuna bo'ling. Barcha xabarlar shu kanalda.</p>
+  {% if channel_url %}<a class="btn block" id="channel-link" href="{{ channel_url }}" target="_blank" rel="noopener">📢 Kanalga o'tish</a>{% endif %}
+  <a class="btn ghost block mt" href="{{ next }}">✅ Obuna bo'ldim</a>
+</div>
+<script>
+  // Telegram ichida t.me havolasi ilovani yopmasdan kanalni ochadi
+  (function () {
+    var link = document.getElementById('channel-link');
+    var tg = window.Telegram && window.Telegram.WebApp;
+    if (link && tg && tg.initData && tg.openTelegramLink) {
+      link.addEventListener('click', function (event) { event.preventDefault(); tg.openTelegramLink(link.href); });
+    }
+  })();
+</script>
+{% endblock %}

@@ -1,9 +1,13 @@
-from aiogram import F, Router
+import logging
+import time
+
+from aiogram import BaseMiddleware, F, Router
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command, CommandObject, CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import (
-    InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, Message,
+    CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, Message,
     ReplyKeyboardMarkup, ReplyKeyboardRemove, WebAppInfo,
 )
 from asgiref.sync import sync_to_async
@@ -15,7 +19,59 @@ from accounts.models import StudyGroup, User
 from accounts.services import get_or_create_tg_user, make_login_token
 from exams.models import Attempt
 
+from . import subscription
+
 router = Router()
+log = logging.getLogger(__name__)
+
+
+class ChannelRequired(BaseMiddleware):
+    """Majburiy obuna: kanalga a'zo bo'lmagan foydalanuvchi botdan foydalana olmaydi."""
+    TTL = 600
+
+    def __init__(self):
+        self.passed = {}  # telegram_id -> qachongacha tekshirmaslik
+
+    async def member(self, bot, user_id):
+        if self.passed.get(user_id, 0) > time.monotonic():
+            return True
+        try:
+            member = await bot.get_chat_member(settings.REQUIRED_CHANNEL_ID, user_id)
+        except TelegramBadRequest as exc:
+            if subscription.is_not_member_error(str(exc)):
+                return False
+            log.warning('Obuna tekshirilmadi: %s', exc)
+            return True
+        except Exception as exc:  # tarmoq: botni to'xtatmaslik uchun o'tkaziladi
+            log.warning('Obuna tekshirilmadi: %s', type(exc).__name__)
+            return True
+        ok = subscription.is_member_status(member.status, getattr(member, 'is_member', None))
+        if ok:
+            self.passed[user_id] = time.monotonic() + self.TTL
+        return ok
+
+    async def __call__(self, handler, event, data):
+        user = data.get('event_from_user')
+        chat = getattr(event, 'chat', None) or getattr(getattr(event, 'message', None), 'chat', None)
+        if not subscription.required() or user is None or (chat and chat.type != 'private'):
+            return await handler(event, data)
+        if await self.member(data['bot'], user.id):
+            return await handler(event, data)
+        markup = InlineKeyboardMarkup.model_validate(subscription.subscribe_markup())
+        if isinstance(event, CallbackQuery):
+            if event.data == 'sub:check':
+                await event.answer("Hali obuna bo'lmagansiz", show_alert=True)
+            else:
+                await event.answer()
+                await event.message.answer(subscription.SUBSCRIBE_TEXT, reply_markup=markup)
+            return None
+        await event.answer(subscription.SUBSCRIBE_TEXT, reply_markup=markup)
+        return None
+
+
+channel_required = ChannelRequired()
+router.message.outer_middleware(channel_required)
+router.callback_query.outer_middleware(channel_required)
 
 BTN_RESULTS = '📊 Natijalarim'
 BTN_HELP = 'ℹ️ Yordam'
@@ -101,6 +157,29 @@ async def cmd_start(message: Message, command: CommandObject, state: FSMContext)
         return
     await state.set_state(Registration.name)
     await message.answer(
+        'Assalomu aleykum. Iltimos ism familyangizni kiring: Masalan : Behruz Hodiyev',
+        reply_markup=ReplyKeyboardRemove(),
+    )
+
+
+@router.callback_query(F.data == 'sub:check')
+async def subscribed(callback: CallbackQuery, state: FSMContext):
+    """Middleware a'zolikni tasdiqlagan: /start dagi kabi davom etadi."""
+    await callback.answer('Rahmat!')
+    try:
+        await callback.message.delete()
+    except TelegramBadRequest:
+        pass
+    user = await _user_for(callback.from_user)
+    if not user.is_active:
+        await callback.message.answer('Hisobingiz bloklangan.')
+        return
+    if user.is_registered:
+        await state.clear()
+        await send_menu(callback.message, user)
+        return
+    await state.set_state(Registration.name)
+    await callback.message.answer(
         'Assalomu aleykum. Iltimos ism familyangizni kiring: Masalan : Behruz Hodiyev',
         reply_markup=ReplyKeyboardRemove(),
     )

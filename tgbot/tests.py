@@ -94,6 +94,33 @@ class BotTests(TransactionTestCase):
         User.objects.filter(telegram_id=TG_ID).update(role='teacher')
         self.assertIn('https://sayt.test/kirish/', self.send('/panel')[0])
 
+    def press(self, data):
+        self.counter += 1
+        user = TgUser(id=TG_ID, is_bot=False, first_name='Ali')
+        shown = Message(message_id=1, date=datetime.datetime.now(), text='x', chat=Chat(id=TG_ID, type='private'))
+        self.session.sent.clear()
+        query = CallbackQuery(id=str(self.counter), from_user=user, chat_instance='c', data=data, message=shown)
+        async_to_sync(self.dp.feed_update)(self.bot, Update(update_id=self.counter, callback_query=query))
+        return self.session.sent
+
+    @override_settings(REQUIRED_CHANNEL_ID='-1001', REQUIRED_CHANNEL_URL='https://t.me/kanal')
+    def test_channel_subscription_required(self):
+        from tgbot import subscription
+        from tgbot.handlers import channel_required
+        channel_required.passed.clear()
+        with patch.object(type(channel_required), 'member', new=AsyncMock(return_value=False)):
+            replies = self.send('/start')
+            self.assertEqual(replies, [subscription.SUBSCRIBE_TEXT])
+            buttons = self.session.sent[-1].reply_markup.inline_keyboard
+            self.assertEqual(buttons[0][0].url, 'https://t.me/kanal')
+            self.assertEqual(buttons[1][0].callback_data, 'sub:check')
+            self.assertFalse(User.objects.filter(telegram_id=TG_ID).exists())
+            sent = self.press('sub:check')
+            self.assertTrue(any(getattr(m, 'show_alert', False) for m in sent))
+        with patch.object(type(channel_required), 'member', new=AsyncMock(return_value=True)):
+            texts = [getattr(m, 'text', None) for m in self.press('sub:check')]
+            self.assertIn('Assalomu aleykum. Iltimos ism familyangizni kiring: Masalan : Behruz Hodiyev', texts)
+
     def test_results_empty_and_blocked(self):
         self.register()
         self.assertIn("yo'q", self.send('/natijalar')[0])

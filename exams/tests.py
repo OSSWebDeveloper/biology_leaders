@@ -171,6 +171,29 @@ class FlowTests(TestCase):
         return self.client.post(reverse('attempt_answer', args=[attempt.pk]), json.dumps(body),
                                 content_type='application/json')
 
+    @override_settings(REQUIRED_CHANNEL_ID='-1001', REQUIRED_CHANNEL_URL='https://t.me/kanal')
+    def test_channel_subscription_required(self):
+        with patch('tgbot.subscription.is_subscribed', return_value=False) as check:
+            page = self.client.get(reverse('exam_list'))
+            self.assertContains(page, "Kanalga obuna bo'ling")
+            self.assertContains(page, 'https://t.me/kanal')
+            self.client.post(reverse('attempt_start', args=[self.exam.access_code]))
+            self.assertFalse(Attempt.objects.exists())
+            check.assert_called_with(self.student.telegram_id)
+        with patch('tgbot.subscription.is_subscribed', return_value=True):
+            self._start()
+
+    def test_subscription_check_reads_status(self):
+        from tgbot import subscription
+        self.assertTrue(subscription.is_member_status('member'))
+        self.assertTrue(subscription.is_member_status('restricted', True))
+        self.assertFalse(subscription.is_member_status('left'))
+        self.assertFalse(subscription.is_member_status('kicked'))
+        self.assertTrue(subscription.is_not_member_error('Bad Request: PARTICIPANT_ID_INVALID'))
+        self.assertFalse(subscription.is_not_member_error('Bad Request: chat not found'))
+        with override_settings(REQUIRED_CHANNEL_ID=''):
+            self.assertTrue(subscription.is_subscribed(123))  # sozlanmagan: tekshirilmaydi
+
     def test_full_flow(self):
         attempt = self._start()
         page = self.client.get(reverse('attempt', args=[attempt.pk]))

@@ -1,13 +1,18 @@
 """O'quvchi sahifalari."""
 import json
+from functools import wraps
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_POST
+
+from tgbot import subscription
 
 from .models import Attempt, Exam, Question
 from .services import can_start, exam_by_code, finalize, save_answer, start_attempt
@@ -18,6 +23,20 @@ def home(request):
     if not request.user.is_authenticated:
         return render(request, 'landing.html')
     return redirect('exam_list')
+
+
+def channel_required(view):
+    """Majburiy obuna: kanalga a'zo bo'lmagan o'quvchi kod kirita olmaydi va test boshlay olmaydi."""
+    @wraps(view)
+    def wrapper(request, *args, **kwargs):
+        user = request.user
+        if (user.is_authenticated and not (user.is_teacher or user.is_admin_role)
+                and not subscription.is_subscribed(user.telegram_id)):
+            return render(request, 'student/subscribe.html', {
+                'channel_url': settings.REQUIRED_CHANNEL_URL, 'next': request.get_full_path() if request.method == 'GET' else reverse('exam_list'),
+                'tab': 'tests'})
+        return view(request, *args, **kwargs)
+    return wrapper
 
 
 def _exam_for_code(code):
@@ -37,6 +56,7 @@ def _own_attempt(request, pk):
 
 
 @login_required
+@channel_required
 def exam_list(request):
     """O'quvchi bosh sahifasi: testlar ro'yxati yo'q, kirish faqat guruhdagi kod bilan."""
     if request.method == 'POST':
@@ -51,6 +71,7 @@ def exam_list(request):
 
 
 @login_required
+@channel_required
 def exam_detail(request, code):
     exam = _exam_for_code(code)
     attempts = exam.attempts.filter(student=request.user, finished_at__isnull=False).order_by('-finished_at')
@@ -68,6 +89,7 @@ def exam_detail(request, code):
 
 @login_required
 @require_POST
+@channel_required
 def attempt_start(request, code):
     exam = _exam_for_code(code)
     active = exam.attempts.filter(student=request.user, finished_at__isnull=True).first()
