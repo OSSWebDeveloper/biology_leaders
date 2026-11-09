@@ -16,7 +16,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from accounts.models import StudyGroup, User
-from accounts.services import get_or_create_tg_user, make_login_token
+from accounts.services import get_or_create_tg_user, make_login_token, touch_seen
 from exams.models import Attempt
 
 from . import subscription
@@ -117,7 +117,9 @@ async def send_menu(message: Message, user: User):
 
 @sync_to_async
 def _user_for(tg):
-    return get_or_create_tg_user(tg.id, tg.first_name or '', tg.last_name or '')
+    user = get_or_create_tg_user(tg.id, tg.first_name or '', tg.last_name or '')
+    touch_seen(user, 'last_bot_seen')
+    return user
 
 
 @sync_to_async
@@ -273,11 +275,6 @@ async def _open_section(message: Message, allowed, path, text):
     await message.answer(text, reply_markup=InlineKeyboardMarkup(inline_keyboard=[[
         InlineKeyboardButton(text='Ochish', web_app=WebAppInfo(url=settings.WEBAPP_URL + path)),
     ]]))
-
-
-@router.message(Command('mrclayd'))
-async def cmd_mrclayd(message: Message):
-    await _open_section(message, lambda u: u.is_admin_role, reverse('entry_admin'), '⚙️ Texnik qism')
 
 
 @router.message(Command('ustoz'))

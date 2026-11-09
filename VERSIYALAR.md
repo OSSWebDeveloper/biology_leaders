@@ -1,5 +1,16 @@
 # Versiyalar tarixi
 
+## 1.10.0 — 2026-11-09
+
+Chrome orqali kirish va texnik qism statistikasi
+
+- /mrclayd va /ustoz kompyuter brauzerida ham ochiladi: «Telegram orqali kirish» o'qituvchi botini ochadi, «Tasdiqlash» bosilgach sahifa o'zi kiradi (token 5 daqiqa, bir martalik, faqat so'ragan brauzerga)
+- /mrclayd faqat brauzer sessiyasida: Telegram Web App ichidan ochilsa «Sahifa topilmadi»; botdagi /mrclayd buyrug'i olib tashlandi
+- /ustoz avvalgidek Web App ichida ham ishlaydi (/ustoz buyrug'i)
+- Texnik qism: hozir onlayn (sayt va bot alohida), test yechayotganlar, bugun/7/30 kunda faol, yangi foydalanuvchilar, 14 kunlik grafik, darajalar, testlar jadvali, server holati; 30 soniyada yangilanadi
+- Foydalanuvchida last_seen va last_bot_seen maydonlari (daqiqasiga ko'pi bilan bir marta yoziladi)
+- .env: TEACHER_BOT_USERNAME
+
 ## 1.9.0 — 2026-11-09
 
 Yashirin kirish manzillari: /mrclayd va /ustoz

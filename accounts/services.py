@@ -6,9 +6,13 @@ import time
 from urllib.parse import parse_qsl
 
 from django.conf import settings
-from django.core import signing
+import datetime
+import secrets
 
-from .models import User
+from django.core import signing
+from django.utils import timezone
+
+from .models import BrowserLogin, User
 
 INIT_DATA_MAX_AGE = 24 * 60 * 60
 LOGIN_LINK_MAX_AGE = 10 * 60
@@ -73,3 +77,49 @@ def check_login_token(token):
         return None
     stamp = user.last_login.isoformat() if user.last_login else ''
     return user if stamp == data.get('l') else None
+
+
+BROWSER_LOGIN_MAX_AGE = 5 * 60
+SEEN_STEP = 60  # oxirgi faollik shundan tez-tez yozilmaydi
+
+
+def touch_seen(user, field='last_seen'):
+    """Foydalanuvchi faolligini belgilaydi (statistikadagi «hozir onlayn» uchun)."""
+    now = timezone.now()
+    last = getattr(user, field)
+    if last and (now - last).total_seconds() < SEEN_STEP:
+        return
+    setattr(user, field, now)
+    User.objects.filter(pk=user.pk).update(**{field: now})
+
+
+def create_browser_login():
+    BrowserLogin.objects.filter(
+        created_at__lt=timezone.now() - datetime.timedelta(seconds=BROWSER_LOGIN_MAX_AGE)).delete()
+    return BrowserLogin.objects.create(token=secrets.token_urlsafe(24)).token
+
+
+def _fresh_login(token):
+    since = timezone.now() - datetime.timedelta(seconds=BROWSER_LOGIN_MAX_AGE)
+    return BrowserLogin.objects.filter(token=token, used=False, created_at__gte=since).first()
+
+
+def approve_browser_login(token, user):
+    """O'qituvchi botidagi tasdiq. Token eskirgan yoki ishlatilgan bo'lsa False."""
+    login = _fresh_login(token)
+    if not login or login.approved_by_id:
+        return False
+    login.approved_by = user
+    login.save(update_fields=['approved_by'])
+    return True
+
+
+def claim_browser_login(token):
+    """Brauzer so'raydi: tasdiqlangan bo'lsa foydalanuvchi (bir marta), aks holda None."""
+    login = _fresh_login(token)
+    if not login or not login.approved_by_id:
+        return None
+    login.used = True
+    login.save(update_fields=['used'])
+    user = login.approved_by
+    return user if user.is_active else None

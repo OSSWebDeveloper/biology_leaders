@@ -4,10 +4,14 @@ from django.contrib import messages
 from django.contrib.auth import login, logout
 from django.core.exceptions import PermissionDenied
 from django.http import Http404, JsonResponse
+from django.conf import settings
 from django.shortcuts import redirect, render
+from django.urls import reverse
 from django.views.decorators.http import require_POST
 
-from .services import check_login_token, get_or_create_tg_user, verify_init_data
+from .services import (
+    check_login_token, claim_browser_login, create_browser_login, get_or_create_tg_user, verify_init_data,
+)
 
 
 @require_POST
@@ -32,7 +36,7 @@ def login_link(request, token):
     user = check_login_token(token)
     if not user:
         return render(request, 'landing.html', {'link_error': True}, status=403)
-    login(request, user, backend='django.contrib.auth.backends.ModelBackend')
+    _login_browser(request, user)
     messages.success(request, f'Xush kelibsiz, {user.display_name}!')
     return redirect('home')
 
@@ -43,23 +47,48 @@ def logout_view(request):
     return redirect('home')
 
 
-# Yashirin kirish manzillari: /mrclayd/ — admin (texnik qism), /ustoz/ — o'qituvchi bo'limi.
-# Telegram ichida ochilsa initData bilan kiradi, so'ng rolga qarab yo'naltiriladi.
+# Yashirin kirish manzillari: /mrclayd/ — texnik qism (faqat admin, faqat kompyuter brauzeri),
+# /ustoz/ — o'qituvchi bo'limi (brauzer yoki Telegram Web App).
+BROWSER_SESSION_KEY = 'browser_login'
 ENTRY_TARGETS = {
     'admin': ('a_dashboard', lambda u: u.is_admin_role, True),
     'teacher': ('t_exams', lambda u: u.is_teacher, False),
 }
 
 
+def _login_browser(request, user):
+    login(request, user, backend='django.contrib.auth.backends.ModelBackend')
+    request.session[BROWSER_SESSION_KEY] = True
+
+
 def entry(request, target):
-    url_name, allowed, hidden = ENTRY_TARGETS[target]
-    if not request.user.is_authenticated:
-        return render(request, 'landing.html', {'after_login': request.path})
+    url_name, allowed, browser_only = ENTRY_TARGETS[target]
     user = request.user
-    if user.telegram_id:  # ADMIN_TELEGRAM_IDS ga keyin qo'shilgan bo'lsa, rol shu yerda yangilanadi
-        user = get_or_create_tg_user(user.telegram_id)
-    if allowed(user):
-        return redirect(url_name)
-    if hidden:
-        raise Http404
-    raise PermissionDenied
+    signed_in = user.is_authenticated and (not browser_only or request.session.get(BROWSER_SESSION_KEY))
+    if signed_in:
+        if user.telegram_id:  # ADMIN_TELEGRAM_IDS ga keyin qo'shilgan bo'lsa, rol shu yerda yangilanadi
+            user = get_or_create_tg_user(user.telegram_id)
+        if allowed(user):
+            return redirect(url_name)
+        if browser_only:
+            raise Http404
+        raise PermissionDenied
+    token = create_browser_login()
+    request.session['browser_login_token'] = token
+    bot = settings.TEACHER_BOT_USERNAME
+    return render(request, 'accounts/browser_login.html', {
+        'target': target, 'browser_only': browser_only, 'hide_nav': True,
+        'bot_username': bot, 'bot_link': f'https://t.me/{bot}?start=login_{token}' if bot else '',
+        'status_url': reverse('browser_login_status'),
+    })
+
+
+def browser_login_status(request):
+    """Kirish sahifasi shu yerni so'rab turadi; o'qituvchi botida tasdiqlansa sessiya ochiladi."""
+    token = request.session.get('browser_login_token')
+    user = claim_browser_login(token) if token else None
+    if user is None:
+        return JsonResponse({'ok': False})
+    request.session.pop('browser_login_token', None)
+    _login_browser(request, user)
+    return JsonResponse({'ok': True})

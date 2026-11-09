@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Kirish{% endblock %}
+{% block body %}
+<div class="center-screen"><div id="box" class="login-box">
+  {% csrf_token %}
+  <div class="spinner" id="spin"></div>
+  <h1 id="ttl">Milliy Sertifikat</h1>
+  <div id="browser" hidden>
+    {% if bot_link %}
+    <p class="muted">Kirish uchun o'qituvchi botida tasdiqlang.</p>
+    <a class="btn block" href="{{ bot_link }}" target="_blank" rel="noopener">Telegram orqali kirish</a>
+    <p class="muted small mt">Tugma @{{ bot_username }} ni ochadi. U yerda «Tasdiqlash» ni bosing, bu sahifa o'zi ochiladi.</p>
+    {% else %}
+    <p class="muted">O'qituvchi boti sozlanmagan (TEACHER_BOT_USERNAME).</p>
+    {% endif %}
+  </div>
+  <p class="muted" id="txt">Kirilmoqda…</p>
+</div></div>
+{% endblock %}
+{% block scripts %}
+<script>
+(function () {
+  const tg = window.Telegram && window.Telegram.WebApp;
+  const spin = document.getElementById('spin'), txt = document.getElementById('txt');
+  const stop = message => { spin.style.display = 'none'; txt.textContent = message || ''; };
+
+  if (tg && tg.initData) {
+    {% if browser_only %}
+    document.getElementById('ttl').textContent = 'Sahifa topilmadi';
+    stop('');
+    {% else %}
+    fetch("{% url 'tg_auth' %}", {
+      method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken()},
+      body: JSON.stringify({init_data: tg.initData}),
+    }).then(r => r.json().catch(() => ({})).then(d => ({ok: r.ok, status: r.status, d}))).then(({ok, status, d}) => {
+      if (ok) location.replace(location.pathname);
+      else stop(d.error || `Kirib bo'lmadi (xato ${status}). Qayta urinib ko'ring.`);
+    }).catch(() => stop("Internet bilan aloqa yo'q. Qayta urinib ko'ring."));
+    {% endif %}
+    return;
+  }
+
+  // Kompyuter brauzeri: bot tasdiqlashini kutamiz
+  spin.style.display = 'none';
+  document.getElementById('browser').hidden = false;
+  txt.textContent = '';
+  {% if bot_link %}
+  const until = Date.now() + 5 * 60 * 1000;
+  const poll = () => {
+    if (Date.now() > until) {
+      txt.innerHTML = "Muddati tugadi. <a href=\"\" onclick=\"location.reload();return false\">Sahifani yangilang</a>.";
+      return;
+    }
+    fetch("{{ status_url }}", {cache: 'no-store'}).then(r => r.json()).then(d => {
+      if (d.ok) { txt.textContent = 'Tasdiqlandi, ochilmoqda…'; location.replace(location.pathname); }
+      else setTimeout(poll, 2000);
+    }).catch(() => setTimeout(poll, 4000));
+  };
+  setTimeout(poll, 2000);
+  {% endif %}
+})();
+</script>
+{% endblock %}

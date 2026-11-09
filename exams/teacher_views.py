@@ -10,10 +10,11 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 from openpyxl import Workbook
 
-from accounts.decorators import admin_required, teacher_required
+from accounts.decorators import admin_browser_required, teacher_required
 from accounts.models import StudyGroup, User
 from tgbot import notify
 
+from . import stats
 from .forms import ExamForm, PdfImportForm, QuestionForm
 from .models import Answer, Attempt, Exam, Question
 from .pdf_import import PdfImportError
@@ -312,23 +313,14 @@ def t_group_delete(request, pk):
 
 # ---------- Admin ----------
 
-@admin_required
+@admin_browser_required
 def a_dashboard(request):
-    roles = dict(User.objects.values_list('role').annotate(n=Count('pk')))
-    finished = Attempt.objects.filter(finished_at__isnull=False)
-    context = {
-        'students': roles.get(User.Role.STUDENT, 0), 'teachers': roles.get(User.Role.TEACHER, 0),
-        'admins': roles.get(User.Role.ADMIN, 0),
-        'exams': Exam.objects.count(), 'published': Exam.objects.filter(status=Exam.Status.PUBLISHED).count(),
-        'attempts': finished.count(), 'average': finished.aggregate(a=Avg('score'))['a'],
-        'groups': StudyGroup.objects.count(),
-        'recent': finished.select_related('student', 'exam').order_by('-finished_at')[:10],
-        'tab': 'admin',
-    }
+    context = stats.collect()
+    context.update(tab='admin', hide_nav=True)
     return render(request, 'admin_panel/dashboard.html', context)
 
 
-@admin_required
+@admin_browser_required
 def a_users(request):
     query = request.GET.get('q', '').strip()
     role = request.GET.get('rol', '')
@@ -341,10 +333,11 @@ def a_users(request):
     if role in User.Role.values:
         users = users.filter(role=role)
     return render(request, 'admin_panel/users.html', {
-        'users': users[:200], 'query': query, 'role': role, 'roles': User.Role.choices, 'tab': 'admin'})
+        'users': users[:200], 'query': query, 'role': role, 'roles': User.Role.choices, 'tab': 'admin',
+        'hide_nav': True})
 
 
-@admin_required
+@admin_browser_required
 @require_POST
 def a_user_update(request, user_id):
     target = get_object_or_404(User, pk=user_id)

@@ -20,7 +20,7 @@
   <a href="{% url 'exam_list' %}" class="{% if tab == 'tests' %}on{% endif %}"><b>📝</b>Testlar</a>
   <a href="{% url 'my_results' %}" class="{% if tab == 'results' %}on{% endif %}"><b>📊</b>Natijalar</a>
   {% if user.is_teacher %}<a href="{% url 't_exams' %}" class="{% if tab == 'teacher' %}on{% endif %}"><b>🎓</b>O'qituvchi</a>{% endif %}
-  {% if user.is_admin_role %}<a href="{% url 'a_dashboard' %}" class="{% if tab == 'admin' %}on{% endif %}"><b>⚙️</b>Admin</a>{% endif %}
+  {% if user.is_admin_role and request.session.browser_login %}<a href="{% url 'a_dashboard' %}" class="{% if tab == 'admin' %}on{% endif %}"><b>⚙️</b>Admin</a>{% endif %}
 </nav>
 {% endif %}
 {% endblock %}

@@ -1,22 +1,132 @@
 {% extends "base.html" %}
-{% block title %}Admin{% endblock %}
+{% block title %}Texnik qism{% endblock %}
+{% block wrapclass %}wide admin{% endblock %}
 {% block content %}
-<div class="row between"><h1>Boshqaruv</h1><a class="btn ghost sm" href="{% url 'a_users' %}">👤 Foydalanuvchilar</a></div>
-<div class="stats">
-  <div class="stat"><b>{{ students }}</b><span>O'quvchi</span></div>
-  <div class="stat"><b>{{ teachers }}</b><span>O'qituvchi</span></div>
-  <div class="stat"><b>{{ admins }}</b><span>Admin</span></div>
-  <div class="stat"><b>{{ groups }}</b><span>Guruh</span></div>
-  <div class="stat"><b>{{ published }} / {{ exams }}</b><span>E'lon qilingan test</span></div>
-  <div class="stat"><b>{{ attempts }}</b><span>Yechilgan</span></div>
-  <div class="stat"><b>{% if average is not None %}{{ average|floatformat:1 }}{% else %}—{% endif %}</b><span>O'rtacha ball</span></div>
+<div class="row between wrapx">
+  <h1 class="mb0">Texnik qism</h1>
+  <div class="row">
+    <span class="muted small" id="upd">{{ now|date:"H:i:s" }} holati · 30 soniyada yangilanadi</span>
+    <a class="btn ghost sm" href="{% url 'a_users' %}">👤 Foydalanuvchilar</a>
+    <a class="btn ghost sm" href="{% url 'admin:index' %}">Django admin</a>
+    <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button class="btn ghost sm">Chiqish</button></form>
+  </div>
 </div>
+
+<h2 class="sec">Hozir</h2>
+<div class="stats">
+  <div class="stat live"><b>{{ online|length }}</b><span>Onlayn ({{ online_minutes }} daqiqa)</span></div>
+  <div class="stat"><b>{{ online_site }}</b><span>Saytda / Web App</span></div>
+  <div class="stat"><b>{{ online_bot }}</b><span>Botda</span></div>
+  <div class="stat"><b>{{ in_progress|length }}</b><span>Hozir test yechyapti</span></div>
+  <div class="stat"><b>{{ open_now }}</b><span>Hozir ochiq test</span></div>
+</div>
+
+<div class="grid2">
+  <div class="card">
+    <h2>Onlayn foydalanuvchilar</h2>
+    <div class="table-wrap"><table class="t">
+      <tr><th>Ism</th><th>Rol</th><th>Qayerda</th><th class="right">Oxirgi</th></tr>
+      {% for u in online %}
+      <tr><td>{{ u.display_name }}</td><td>{{ u.get_role_display }}</td>
+        <td>{% if u.on_site %}<span class="tag">sayt</span>{% endif %} {% if u.on_bot %}<span class="tag plain">bot</span>{% endif %}</td>
+        <td class="right muted">{% if u.just_now %}hozir{% else %}{{ u.seen|timesince }} oldin{% endif %}</td></tr>
+      {% empty %}<tr><td colspan="4" class="empty-state">Hozir hech kim yo'q.</td></tr>{% endfor %}
+    </table></div>
+  </div>
+  <div class="card">
+    <h2>Test yechayotganlar</h2>
+    <div class="table-wrap"><table class="t">
+      <tr><th>O'quvchi</th><th>Test</th><th class="right">Qolgan vaqt</th></tr>
+      {% for a in in_progress %}
+      <tr><td>{{ a.student.display_name }}</td><td>{{ a.exam.title }}</td><td class="right">{{ a.deadline|timeuntil }}</td></tr>
+      {% empty %}<tr><td colspan="3" class="empty-state">Hozir test yechilmayapti.</td></tr>{% endfor %}
+    </table></div>
+  </div>
+</div>
+
+<h2 class="sec">Foydalanuvchilar</h2>
+<div class="stats">
+  <div class="stat"><b>{{ total_users }}</b><span>Jami</span></div>
+  <div class="stat"><b>{{ active_today }}</b><span>Bugun faol</span></div>
+  <div class="stat"><b>{{ active_week }}</b><span>7 kunda faol</span></div>
+  <div class="stat"><b>{{ active_month }}</b><span>30 kunda faol</span></div>
+  <div class="stat"><b>{{ new_today }}</b><span>Bugun qo'shildi</span></div>
+  <div class="stat"><b>{{ new_week }}</b><span>7 kunda qo'shildi</span></div>
+  <div class="stat"><b>{{ registered }}</b><span>Ism va telefonli</span></div>
+  <div class="stat"><b>{{ students }} · {{ teachers }} · {{ admins }}</b><span>O'quvchi · o'qituvchi · admin</span></div>
+  <div class="stat"><b>{{ blocked }}</b><span>Bloklangan</span></div>
+</div>
+
+<h2 class="sec">Testlar</h2>
+<div class="stats">
+  <div class="stat"><b>{{ published }} / {{ exams_total }}</b><span>E'lon qilingan / jami</span></div>
+  <div class="stat"><b>{{ solved_total }}</b><span>Yechilgan (jami)</span></div>
+  <div class="stat"><b>{{ solved_today }}</b><span>Bugun yechilgan</span></div>
+  <div class="stat"><b>{% if average is not None %}{{ average|floatformat:1 }}{% else %}—{% endif %}</b><span>O'rtacha ball (75 dan)</span></div>
+</div>
+
+<div class="grid2">
+  <div class="card">
+    <h2>Oxirgi {{ days|length }} kun</h2>
+    <div class="legend small muted"><span><i class="sw joined"></i>Yangi foydalanuvchi</span><span><i class="sw solved"></i>Yechilgan test</span></div>
+    <div class="chart">
+      {% for d in days %}
+      <div class="col" title="{{ d.day|date:'d.m' }}: {{ d.joined }} yangi, {{ d.solved }} yechildi">
+        <div class="bars"><i class="joined" style="height:{{ d.joined_pct }}%"></i><i class="solved" style="height:{{ d.solved_pct }}%"></i></div>
+        <small>{{ d.day|date:"d" }}</small>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  <div class="card">
+    <h2>Darajalar</h2>
+    <p class="muted small mb0">«—» darajasiz natijalar (C dan past).</p>
+    {% for g in grades %}
+    <div class="grade-row"><b>{{ g.grade }}</b><div class="bar grow"><i style="width:{{ g.pct }}%"></i></div><span class="muted small">{{ g.n }}</span></div>
+    {% endfor %}
+  </div>
+</div>
+
 <div class="card">
-  <h2>Oxirgi natijalar</h2>
+  <h2>Testlar bo'yicha</h2>
   <div class="table-wrap"><table class="t">
-    {% for a in recent %}
-    <tr><td>{{ a.student.display_name }}<div class="muted small">{{ a.exam.title }}</div></td><td class="right"><b>{{ a.score }}</b> · {{ a.grade|default:"—" }}<div class="muted small">{{ a.finished_at|date:"d.m H:i" }}</div></td></tr>
-    {% empty %}<tr><td class="empty-state">Hali natija yo'q.</td></tr>{% endfor %}
+    <tr><th>Test</th><th>Kod</th><th>Holati</th><th>Muallif</th><th class="right">Yechmoqda</th><th class="right">Yechilgan</th><th class="right">O'rtacha</th></tr>
+    {% for e in exams %}
+    <tr><td>{{ e.title }}</td><td><code>{{ e.access_code }}</code></td>
+      <td>{% if e.is_published %}<span class="tag ok">e'lon</span>{% else %}<span class="tag plain">qoralama</span>{% endif %}</td>
+      <td class="muted">{{ e.created_by.display_name|default:"—" }}</td>
+      <td class="right">{{ e.active }}</td><td class="right">{{ e.done }}</td>
+      <td class="right">{% if e.avg is not None %}{{ e.avg|floatformat:1 }}{% else %}—{% endif %}</td></tr>
+    {% empty %}<tr><td colspan="7" class="empty-state">Test yo'q.</td></tr>{% endfor %}
   </table></div>
 </div>
+
+<div class="grid2">
+  <div class="card">
+    <h2>Oxirgi natijalar</h2>
+    <div class="table-wrap"><table class="t">
+      {% for a in recent %}
+      <tr><td>{{ a.student.display_name }}<div class="muted small">{{ a.exam.title }}</div></td><td class="right"><b>{{ a.score|floatformat:1 }}</b> · {{ a.grade|default:"—" }}<div class="muted small">{{ a.finished_at|date:"d.m H:i" }}</div></td></tr>
+      {% empty %}<tr><td class="empty-state">Hali natija yo'q.</td></tr>{% endfor %}
+    </table></div>
+  </div>
+  <div class="card">
+    <h2>Server</h2>
+    <table class="t">
+      <tr><td class="muted">Versiya</td><td class="right">v{{ tech.version }}</td></tr>
+      <tr><td class="muted">Python / Django</td><td class="right">{{ tech.python }} / {{ tech.django }}</td></tr>
+      <tr><td class="muted">Tizim</td><td class="right">{{ tech.os }}</td></tr>
+      <tr><td class="muted">Baza</td><td class="right">{{ tech.db_mb }} MB</td></tr>
+      <tr><td class="muted">Fayllar (media)</td><td class="right">{{ tech.media_mb }} MB</td></tr>
+      <tr><td class="muted">Manzil</td><td class="right small">{{ tech.webapp_url|default:"—" }}</td></tr>
+      <tr><td class="muted">DEBUG</td><td class="right">{% if tech.debug %}<span class="tag warn">yoqiq</span>{% else %}<span class="tag ok">o'chiq</span>{% endif %}</td></tr>
+      <tr><td class="muted">Majburiy obuna</td><td class="right">{% if tech.channel %}<span class="tag ok">yoqiq</span>{% else %}<span class="tag plain">o'chiq</span>{% endif %}</td></tr>
+    </table>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+setInterval(() => { if (!document.hidden) location.reload(); }, 30000);
+</script>
 {% endblock %}

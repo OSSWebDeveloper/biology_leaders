@@ -15,6 +15,8 @@ class User(AbstractUser):
     telegram_id = models.BigIntegerField("Telegram ID", unique=True, null=True, blank=True)
     full_name = models.CharField("F.I.Sh.", max_length=150, blank=True)
     phone = models.CharField("Telefon", max_length=20, blank=True)
+    last_seen = models.DateTimeField("Saytda oxirgi marta", null=True, blank=True)
+    last_bot_seen = models.DateTimeField("Botda oxirgi marta", null=True, blank=True)
 
     @property
     def is_teacher(self):
@@ -63,3 +65,11 @@ class StudyGroup(models.Model):
 
     def __str__(self):
         return self.name
+
+
+class BrowserLogin(models.Model):
+    """Kompyuter brauzeridan kirish: sahifa token yaratadi, o'qituvchi boti tasdiqlaydi."""
+    token = models.CharField(max_length=64, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    approved_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.CASCADE)
+    used = models.BooleanField(default=False)

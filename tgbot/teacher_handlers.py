@@ -20,7 +20,7 @@ from django.db.models import Avg
 from django.utils import timezone
 
 from accounts.models import User
-from accounts.services import get_or_create_tg_user
+from accounts.services import approve_browser_login, get_or_create_tg_user, touch_seen
 from exams.forms import PdfImportForm
 from exams.models import Exam, Question
 from exams.pdf_import import PdfImportError
@@ -117,9 +117,13 @@ router.callback_query.outer_middleware(TeacherOnly())
 @sync_to_async
 def _teacher_for(tg_id):
     if tg_id in settings.ADMIN_TELEGRAM_IDS:
-        return get_or_create_tg_user(tg_id)
-    user = User.objects.filter(telegram_id=tg_id, is_active=True).first()
-    return user if user and user.is_teacher else None
+        user = get_or_create_tg_user(tg_id)
+    else:
+        user = User.objects.filter(telegram_id=tg_id, is_active=True).first()
+        if not (user and user.is_teacher):
+            return None
+    touch_seen(user, 'last_bot_seen')
+    return user
 
 
 def parse_times(text, now=None):
@@ -360,6 +364,32 @@ def _format_missing(numbers):
 
 
 # ---------- Buyruqlar: istalgan bosqichda ishlaydi ----------
+
+@router.message(CommandStart(deep_link=True, magic=F.args.startswith('login_')))
+async def cmd_browser_login(message: Message, command: CommandObject):
+    """Kompyuter brauzeridan kirish: sahifadagi «Telegram orqali kirish» tugmasi shu yerga olib keladi."""
+    token = command.args[len('login_'):]
+    await message.answer(
+        "💻 Kompyuter brauzerida saytga kirish so'raldi.\n\n"
+        "Agar tugmani hozir o'zingiz bosgan bo'lsangiz, tasdiqlang. Aks holda e'tibor bermang.",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[[
+            InlineKeyboardButton(text='✅ Tasdiqlash', callback_data=f'blogin:{token}'),
+            InlineKeyboardButton(text='Rad etish', callback_data='blogin:-'),
+        ]]))
+
+
+@router.callback_query(F.data.startswith('blogin:'))
+async def cb_browser_login(callback: CallbackQuery, teacher):
+    token = callback.data[len('blogin:'):]
+    if token == '-':
+        text = 'Kirish rad etildi.'
+    elif await sync_to_async(approve_browser_login)(token, teacher):
+        text = "✅ Tasdiqlandi. Brauzerdagi sahifa o'zi ochiladi."
+    else:
+        text = 'Havola eskirgan yoki ishlatilgan. Brauzerda sahifani yangilang.'
+    await callback.message.edit_text(text)
+    await callback.answer()
+
 
 @router.message(CommandStart())
 async def cmd_start(message: Message, state: FSMContext, teacher):

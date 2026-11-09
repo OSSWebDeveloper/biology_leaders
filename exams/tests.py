@@ -394,18 +394,21 @@ class RoleTests(TestCase):
 
     def test_student_blocked_from_panels(self):
         self.client.force_login(self.student)
-        for url in (reverse('t_exams'), reverse('t_exam', args=[self.exam.pk]), reverse('a_dashboard'), reverse('a_users')):
+        for url in (reverse('t_exams'), reverse('t_exam', args=[self.exam.pk])):
             self.assertEqual(self.client.get(url).status_code, 403, url)
+        for url in (reverse('a_dashboard'), reverse('a_users')):  # texnik qism borligi bilinmaydi
+            self.assertEqual(self.client.get(url).status_code, 404, url)
 
     def test_anonymous_redirected(self):
-        for url in (reverse('exam_list'), reverse('t_exams'), reverse('a_dashboard')):
+        for url in (reverse('exam_list'), reverse('t_exams')):
             self.assertEqual(self.client.get(url).status_code, 302, url)
+        self.assertEqual(self.client.get(reverse('a_dashboard')).status_code, 404)
 
     def test_teacher_cannot_touch_foreign_exam_or_admin(self):
         self.client.force_login(self.other)
         self.assertEqual(self.client.get(reverse('t_exam', args=[self.exam.pk])).status_code, 403)
         self.assertEqual(self.client.post(reverse('t_publish', args=[self.exam.pk])).status_code, 403)
-        self.assertEqual(self.client.get(reverse('a_users')).status_code, 403)
+        self.assertEqual(self.client.get(reverse('a_users')).status_code, 404)
 
     def _settings(self, **extra):
         return {'title': 'T', 'subject': 'M', 'duration_min': 10, 'max_attempts': 1, 'weight_mcq': 1,
@@ -441,8 +444,20 @@ class RoleTests(TestCase):
         self.exam.refresh_from_db()
         self.assertTrue(self.exam.is_published)
 
-    def test_admin_changes_role_but_not_self(self):
+    def login_admin_browser(self):
         self.client.force_login(self.admin)
+        session = self.client.session
+        session['browser_login'] = True
+        session.save()
+
+    def test_admin_panel_only_in_browser_session(self):
+        self.client.force_login(self.admin)  # Telegram Web App sessiyasi
+        self.assertEqual(self.client.get(reverse('a_dashboard')).status_code, 404)
+        self.login_admin_browser()
+        self.assertEqual(self.client.get(reverse('a_dashboard')).status_code, 200)
+
+    def test_admin_changes_role_but_not_self(self):
+        self.login_admin_browser()
         self.client.post(reverse('a_user_update', args=[self.student.pk]), {'role': 'teacher'})
         self.student.refresh_from_db()
         self.assertEqual(self.student.role, 'teacher')
@@ -451,7 +466,7 @@ class RoleTests(TestCase):
         self.assertEqual(self.admin.role, 'admin')
 
     def test_all_panel_pages_render(self):
-        self.client.force_login(self.admin)
+        self.login_admin_browser()
         group = StudyGroup.objects.create(name='G', teacher=self.admin)
         q = self.exam.questions.first()
         for url in (reverse('t_exams'), reverse('t_exam_new'), reverse('t_exam', args=[self.exam.pk]),
