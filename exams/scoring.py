@@ -8,13 +8,16 @@ import re
 
 SCALE_MAX = 75
 # (chegara, daraja): rasmiy jadval, ball 75 lik shkalada
-GRADES = [(70, 'A+'), (65, 'A'), (60, 'B+'), (55, 'B'), (50, 'C+'), (46, 'C')]
+# A+ — 70 dan yuqori (70 ning o'zi A)
+GRADES = [(65, 'A'), (60, 'B+'), (55, 'B'), (50, 'C+'), (46, 'C')]
 MAX_INPUT_LEN = 64
 _TOLERANCE = 1e-6
 _ALTERNATIVES = re.compile(r'\s+or\s+|\|', re.IGNORECASE)
 
 
 def grade_for(score):
+    if score > 70:
+        return 'A+'
     for bound, grade in GRADES:
         if score >= bound:
             return grade

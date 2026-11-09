@@ -1,7 +1,7 @@
 """Rasch (1PL) modeli: savol qiyinligi va o'quvchi qobiliyati shu testni yechganlarning javoblaridan birga baholanadi.
 
 Usul: JML (joint maximum likelihood). Hamma o'quvchi bir xil yechgan savol (hamma to'g'ri yoki hamma xato)
-qiyinlik haqida ma'lumot bermaydi va hisobga olinmaydi. Hamma savolni to'g'ri yoki hammasini xato yechgan
+qiyinlik haqida ma'lumot bermaydi va hisobga olinmaydi (takroriy kesish, _trim). Hamma savolni to'g'ri yoki hammasini xato yechgan
 o'quvchining bahosi cheksizga ketmasligi uchun xom ball 0,3 ga suriladi.
 
 Ball: qobiliyat standartlashtiriladi va T = 50 + 10·Z ga o'tkaziladi, 0–75 oralig'ida cheklanadi.
@@ -37,26 +37,48 @@ def _person_theta(row, b, theta=0.0):
     return theta
 
 
+MAX_LOGIT = 10.0  # bundan katta qiyinlik: ma'lumot modelga sig'madi (masalan, Guttman ko'rinishi)
+
+
+def _trim(responses):
+    """Ma'lumot beradigan savol va o'quvchilarni topadi.
+
+    Hamma to'g'ri yoki hamma xato yechgan savol, hamma savolni to'g'ri yoki xato yechgan o'quvchi
+    hisobdan chiqariladi. Biri chiqarilganda boshqasi chegaraviy bo'lib qolishi mumkin, shuning uchun
+    o'zgarish qolmaguncha takrorlanadi (aks holda savol qiyinligi cheksizga ketib, hamma ballni buzadi).
+    """
+    persons = list(range(len(responses)))
+    items = list(range(len(responses[0])))
+    while True:
+        new_items = [i for i in items if 0 < sum(responses[k][i] for k in persons) < len(persons)]
+        new_persons = [k for k in persons if 0 < sum(responses[k][i] for i in new_items) < len(new_items)]
+        if new_items == items and new_persons == persons:
+            return persons, items
+        persons, items = new_persons, new_items
+        if not items or not persons:
+            return [], []
+
+
 def estimate(responses, iterations=300):
-    """responses: o'quvchilar ro'yxati, har biri 0/1 qatori. Qaytaradi: (thetalar, qiyinliklar yoki None)."""
-    if not responses or not responses[0]:
-        return [0.0] * len(responses), None
-    columns = list(zip(*responses))
+    """responses: o'quvchilar ro'yxati, har biri 0/1 qatori.
+
+    Qaytaradi: (thetalar, qiyinliklar). Model ishonchli baho bera olmasa (ma'lumot yetarli emas,
+    yaqinlashmadi yoki qiymatlar cheksizga ketdi) qiyinliklar o'rniga None.
+    """
     n = len(responses)
-    kept = [i for i, col in enumerate(columns) if 0 < sum(col) < n]
-    if not kept:
+    if not responses or not responses[0]:
+        return [0.0] * n, None
+    middle, kept = _trim(responses)
+    if len(middle) < 2 or len(kept) < 2:
         return [0.0] * n, None
     matrix = [[row[i] for i in kept] for row in responses]
     length = len(kept)
     raw = [sum(row) for row in matrix]
-    # Qiyinlikni faqat chegaraviy bo'lmagan o'quvchilar baholaydi
-    middle = [k for k, r in enumerate(raw) if 0 < r < length]
-    if not middle:
-        return [0.0] * n, None
 
     sums = [sum(matrix[k][i] for k in middle) for i in range(length)]
     b = [math.log((len(middle) - s + EXTREME_SHIFT) / (s + EXTREME_SHIFT)) for s in sums]
     theta = {k: math.log(raw[k] / (length - raw[k])) for k in middle}
+    converged = False
     for _ in range(iterations):
         biggest = 0.0
         for i in range(length):
@@ -74,11 +96,42 @@ def estimate(responses, iterations=300):
             biggest = max(biggest, abs(new - theta[k]))
             theta[k] = new
         if biggest < 1e-5:
+            converged = True
             break
+    if not converged or max(abs(bi) for bi in b) > MAX_LOGIT:
+        return [0.0] * n, None
     if length > 1:  # JML siljishini kamaytirish
         b = [bi * (length - 1) / length for bi in b]
-    thetas = [_person_theta(row, b) for row in matrix]
-    return thetas, b
+
+    # Kesishda chiqib ketgan, lekin umuman olganda ma'lumot beradigan savollar (masalan, faqat bo'sh
+    # varaq xato qilgan oson savol) qaytariladi: qiyinligi 0,3 siljitish bilan baholanadi. Shunda
+    # o'quvchi bahosi hamma shunday savollar bo'yicha olinadi va ko'proq to'g'ri javob doim yuqoriroq.
+    provisional = [_person_theta(row, b) for row in matrix]  # hamma o'quvchi, qolgan savollar bo'yicha
+    by_index = dict(zip(kept, b))
+    full_items = [i for i, col in enumerate(zip(*responses)) if 0 < sum(col) < n]
+    for i in full_items:
+        if i not in by_index:
+            hits = sum(row[i] for row in responses)
+            by_index[i] = _item_b(hits, provisional)
+    full_b = [by_index[i] for i in full_items]
+    thetas = [_person_theta([row[i] for i in full_items], full_b) for row in responses]
+    return thetas, full_b
+
+
+def _item_b(hits, thetas, b=0.0):
+    """Shaxslar qobiliyati ma'lum bo'lganda bitta savol qiyinligi; chegaraviy son 0,3 ga suriladi."""
+    count = len(thetas)
+    hits = min(max(hits, EXTREME_SHIFT), count - EXTREME_SHIFT)
+    for _ in range(100):
+        probs = [_p(t, b) for t in thetas]
+        info = sum(p * (1 - p) for p in probs)
+        if info < 1e-12:
+            break
+        step = max(-MAX_STEP, min(MAX_STEP, (sum(probs) - hits) / info))
+        b += step
+        if abs(step) < 1e-6:
+            break
+    return b
 
 
 def t_scores(thetas):

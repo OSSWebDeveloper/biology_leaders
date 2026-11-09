@@ -1,5 +1,17 @@
 # Versiyalar tarixi
 
+## 1.18.0 — 2026-11-09
+
+Rasch hisobi tuzatildi (agentlar tekshiruvi bo'yicha)
+
+- Chegaraviy savol/o'quvchilar takroriy kesiladi: bitta bo'sh varaq oson savol qiyinligini cheksizga olib ketib, hamma ballni siqib qo'ymaydi; kesilgan savollar 0,3 siljitish bilan qaytariladi (ko'proq to'g'ri — doim yuqoriroq ball)
+- Model yaqinlashmasa yoki qiymatlar cheksizga ketsa (Guttman ko'rinishi) ball to'g'ri javoblar ulushidan
+- Javob bergan o'quvchi 20 tadan kam bo'lsa ball doim 75 x ulush (kichik guruhda Rasch ishonchsiz)
+- Bo'sh varaq Rasch hisobiga kirmaydi, unga 0 ball
+- Yakunlash va tekshirish bitta tranzaksiyada; Rasch qayta hisobi faqat bot aylanishida (30 s), sayt va bot bir-birini bosib ketmaydi
+- O'qituvchi botida kalitning har bir qismi saqlanganda javoblar qayta tekshiriladi
+- A+ faqat 70 dan yuqori ball (70 — A)
+
 ## 1.17.0 — 2026-11-09
 
 Boshlanish vaqtida avtomatik e'lon va kanalga xabar

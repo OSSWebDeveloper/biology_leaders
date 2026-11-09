@@ -8,7 +8,7 @@ from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 
-from exams.services import finish_expired, publish_due
+from exams.services import finish_expired, publish_due, rescore_pending
 from tgbot.handlers import router
 
 log = logging.getLogger(__name__)
@@ -26,6 +26,10 @@ async def expiry_loop():
             await sync_to_async(finish_expired)()
         except Exception:
             log.exception('finish_expired xatosi')
+        try:
+            await sync_to_async(rescore_pending)()
+        except Exception:
+            log.exception('rescore_pending xatosi')
         await asyncio.sleep(30)
 
 

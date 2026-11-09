@@ -60,12 +60,14 @@ def finalize(attempt):
     """Urinishni bir marta yakunlaydi, baholaydi va natijani botga yuboradi."""
     now = timezone.now()
     finished_at = min(now, attempt.deadline)
-    claimed = Attempt.objects.filter(pk=attempt.pk, finished_at__isnull=True).update(finished_at=finished_at)
-    attempt.refresh_from_db()
-    if not claimed:
-        return attempt
-    grade_attempt(attempt)
-    rasch_rescore(attempt.exam)
+    # Yakunlash va tekshirish bitta tranzaksiyada: qayta hisob yarim tekshirilgan urinishni ko'rmasin
+    with transaction.atomic():
+        claimed = Attempt.objects.filter(pk=attempt.pk, finished_at__isnull=True).update(finished_at=finished_at)
+        attempt.refresh_from_db()
+        if not claimed:
+            return attempt
+        grade_attempt(attempt)  # vaqtincha ball: to'g'ri javoblar ulushidan
+        Exam.objects.filter(pk=attempt.exam_id).update(needs_rescore=True)
     notify.attempt_result(attempt)
     return attempt
 
@@ -110,35 +112,64 @@ def publish_due(now=None):
 
 
 def regrade_exam(exam):
-    for attempt in exam.attempts.filter(finished_at__isnull=False).prefetch_related('answers'):
-        grade_attempt(attempt)
-    rasch_rescore(exam)
+    """Kalit o'zgargach: javoblar qayta tekshiriladi, Rasch balli bot aylanishida yangilanadi."""
+    with transaction.atomic():
+        for attempt in exam.attempts.filter(finished_at__isnull=False).prefetch_related('answers'):
+            grade_attempt(attempt)
+        Exam.objects.filter(pk=exam.pk).update(needs_rescore=True)
+
+
+def rescore_pending():
+    """Bot fon aylanishi chaqiradi: yangi yakunlangan yoki kaliti o'zgargan testlarning Rasch balli."""
+    count = 0
+    for exam in Exam.objects.filter(needs_rescore=True):
+        # Avval belgini olib qo'yamiz: hisob paytida yangi urinish yakunlansa, belgi yana qo'yiladi
+        if Exam.objects.filter(pk=exam.pk, needs_rescore=True).update(needs_rescore=False):
+            rasch_rescore(exam)
+            count += 1
+    return count
+
+
+MIN_RASCH_RESPONDENTS = 20  # bundan kam bo'lsa ball to'g'ri javoblar ulushidan (Rasch kichik guruhda ishonchsiz)
+
+
+def _is_blank(attempt):
+    return not any(a.choice or a.value_a.strip() or a.value_b.strip() for a in attempt.answers.all())
 
 
 def rasch_rescore(exam):
-    """Shu testni yakunlagan hammaning ballini Rasch modeli bilan qayta hisoblaydi.
+    """Shu testni yakunlaganlarning ballini qayta hisoblaydi.
 
-    Ball boshqalar natijasiga bog'liq: har yangi yakunlangan urinishdan keyin hammasi yangilanadi.
+    Javob bergan o'quvchilar kamida MIN_RASCH_RESPONDENTS bo'lsa Rasch modeli (ball guruhga nisbatan),
+    aks holda yoki model ishonchli baho bera olmasa: 75 x to'g'ri javoblar ulushi. Bo'sh varaq
+    (birorta ham javob yo'q) Rasch hisobiga kirmaydi, chunki u boshqalarning ballini buzadi; unga 0.
     """
     items = [(q.pk, part) for q in exam.questions.all() if q.has_key()
              for part in (('a', 'b') if q.max_items == 2 else ('a',))]
     attempts = list(exam.attempts.filter(finished_at__isnull=False).prefetch_related('answers'))
     if not attempts:
         return
-    responses = []
+    answered = [a for a in attempts if not _is_blank(a)]
+    scores = {}
+    if len(answered) >= MIN_RASCH_RESPONDENTS:
+        responses = []
+        for attempt in answered:
+            answers = {a.question_id: a for a in attempt.answers.all()}
+            responses.append([int(bool(answers.get(pk) and getattr(answers[pk], 'correct_' + part)))
+                              for pk, part in items])
+        thetas, difficulties = rasch.estimate(responses)
+        if difficulties is not None:
+            t = rasch.t_scores(thetas)
+            if len(set(t)) > 1:
+                scores = {attempt.pk: score for attempt, score in zip(answered, t)}
     for attempt in attempts:
-        answers = {a.question_id: a for a in attempt.answers.all()}
-        responses.append([int(bool(answers.get(pk) and getattr(answers[pk], 'correct_' + part)))
-                          for pk, part in items])
-    thetas, difficulties = rasch.estimate(responses)
-    scores = rasch.t_scores(thetas)
-    if difficulties is None or len(set(scores)) < 2:
-        # Rasch ajrata olmadi (bitta qatnashchi, hamma bir xil yoki hammasi 0/hammasi to'g'ri):
-        # hammaga 50 berish o'rniga to'g'ri javoblar ulushidan ball
-        scores = [round(SCALE_MAX * attempt.percent / 100, 1) for attempt in attempts]
-    for attempt, score in zip(attempts, scores):
-        attempt.score = score
-        attempt.grade = grade_for(score)
+        if _is_blank(attempt):
+            attempt.score = 0
+        elif attempt.pk in scores:
+            attempt.score = scores[attempt.pk]
+        else:
+            attempt.score = round(SCALE_MAX * attempt.percent / 100, 1)
+        attempt.grade = grade_for(attempt.score)
     Attempt.objects.bulk_update(attempts, ['score', 'grade'])
 
 

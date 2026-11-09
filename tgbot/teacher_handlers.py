@@ -172,6 +172,8 @@ def _apply_compact(exam_id, kind, text):
         question.correct = letter
         question.save(update_fields=['correct'])
         saved += 1
+    if saved:
+        _regrade_now(exam_id)  # kalit yarim yo'lda tashlab ketilsa ham ballar eskirib qolmasin
     missing = [index for index, question in enumerate(questions, 1) if not question.has_key()]
     return saved, errors, missing
 
@@ -203,6 +205,7 @@ def _save_written(exam_id, number, text):
     else:
         question.answer_a = text.strip()
     question.save(update_fields=['answer_a', 'answer_b'])
+    _regrade_now(exam_id)
     return None
 
 
@@ -211,11 +214,13 @@ def _is_complete(exam_id):
     return not Exam.objects.get(pk=exam_id).missing_keys()
 
 
-@sync_to_async
-def _regrade(exam_id):
+def _regrade_now(exam_id):
     exam = Exam.objects.get(pk=exam_id)
     if exam.attempts.filter(finished_at__isnull=False).exists():
         regrade_exam(exam)
+
+
+_regrade = sync_to_async(_regrade_now)
 
 
 @sync_to_async

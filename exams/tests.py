@@ -49,6 +49,49 @@ class RaschTests(TestCase):
         self.assertTrue(all(0 <= s <= 75 for s in scores))
         self.assertAlmostEqual(sum(scores) / len(scores), 50, delta=1)
 
+    @staticmethod
+    def simulate(persons, items, seed, easy_first=False):
+        import math
+        import random
+        rnd = random.Random(seed)
+        difficulties = [rnd.gauss(0, 1) for _ in range(items)]
+        rows = []
+        for _ in range(persons):
+            ability = rnd.gauss(0, 1)
+            rows.append([int(rnd.random() < 1 / (1 + math.exp(difficulties[i] - ability))) for i in range(items)])
+        if easy_first:
+            for row in rows:
+                row[0] = 1
+        return rows
+
+    def test_blank_paper_does_not_squash_others(self):
+        # Hamma javob bergan oson savol + bitta bo'sh varaq: avval bu savol qiyinligi cheksizga ketib,
+        # qolgan hamma ballni 47–57 ga siqib qo'yardi
+        from .rasch import estimate, t_scores
+        rows = self.simulate(30, 45, seed=5, easy_first=True)
+        before = t_scores(estimate(rows)[0])
+        thetas, difficulties = estimate(rows + [[0] * 45])
+        self.assertIsNotNone(difficulties)
+        self.assertLess(max(abs(b) for b in difficulties), 10)
+        after = t_scores(thetas)[:30]
+        # avval oraliq ~10 ballga tushardi; bo'sh varaq baribir rasch_rescore da hisobga kirmaydi
+        self.assertGreater(max(after) - min(after), 0.5 * (max(before) - min(before)))
+
+    def test_monotonic_on_simulated_data(self):
+        from .rasch import estimate, t_scores
+        rows = self.simulate(150, 55, seed=1)
+        scores = t_scores(estimate(rows)[0])
+        raw = [sum(r) for r in rows]
+        for i in range(len(rows)):
+            for j in range(len(rows)):
+                if raw[i] < raw[j]:
+                    self.assertLessEqual(scores[i], scores[j])
+
+    def test_guttman_pattern_not_estimated(self):
+        from .rasch import estimate
+        rows = [[1] * 50 + [0] * 5, [1] * 30 + [0] * 25, [1] * 5 + [0] * 50]
+        self.assertIsNone(estimate(rows)[1])
+
     def test_degenerate_cases(self):
         from .rasch import estimate, t_scores
         self.assertEqual(t_scores(estimate([[1, 0, 1]])[0]), [50])
@@ -115,8 +158,9 @@ class ScoringTests(TestCase):
         self.assertIsNone(parse_value('(((('))
 
     def test_grades(self):
-        self.assertEqual([grade_for(s) for s in (70, 69.9, 65, 60, 55, 50, 46, 45.9)],
-                         ['A+', 'A', 'A', 'B+', 'B', 'C+', 'C', ''])
+        # A+ — 70 dan yuqori; 70 ning o'zi A
+        self.assertEqual([grade_for(s) for s in (70.1, 70, 69.9, 65, 60, 55, 50, 46, 45.9)],
+                         ['A+', 'A', 'A', 'A', 'B+', 'B', 'C+', 'C', ''])
 
     def test_key_table(self):
         self.assertEqual(parse_mcq_key(['№', 'Javob', '1', 'C', '8', 'D', '36', '4', '6']), {1: 'C', 8: 'D'})
@@ -720,3 +764,64 @@ class AutoPublishTests(TestCase):
         self.exam.refresh_from_db()
         self.assertIsNone(self.exam.channel_posted_at)
         self.assertContains(self.client.get(reverse('t_exam', args=[self.exam.pk])), 'boshlanish vaqtida avtomatik')
+
+
+@override_settings(NOTIFY_DISABLED=True)
+class RescoreTests(TestCase):
+    def setUp(self):
+        self.exam = make_exam()
+        self.q1, self.q2, self.q3 = self.exam.questions.all()
+
+    def finish(self, tg_id, right=(), blank=False):
+        from .services import finalize, save_answer, start_attempt
+        attempt = start_attempt(self.exam, make_user(tg_id))
+        if not blank:
+            save_answer(attempt, self.q1, choice='B' if 1 in right else 'A')
+            save_answer(attempt, self.q2, choice='F' if 2 in right else 'A')
+            save_answer(attempt, self.q3, value_a='2√5' if 3 in right else '1', value_b='16/3' if 4 in right else '1')
+        return finalize(attempt)
+
+    def test_finalize_marks_exam_and_bot_loop_rescores(self):
+        from .services import rescore_pending
+        self.finish(1, right=(1, 2))
+        self.exam.refresh_from_db()
+        self.assertTrue(self.exam.needs_rescore)
+        self.assertEqual(rescore_pending(), 1)
+        self.exam.refresh_from_db()
+        self.assertFalse(self.exam.needs_rescore)
+        self.assertEqual(rescore_pending(), 0)
+
+    def test_small_group_uses_percent(self):
+        from .services import rasch_rescore
+        best = self.finish(1, right=(1, 2, 3, 4))
+        mid = self.finish(2, right=(1, 2))
+        low = self.finish(3, right=(1,))
+        rasch_rescore(self.exam)
+        scores = dict(Attempt.objects.values_list('pk', 'score'))
+        self.assertEqual((scores[best.pk], scores[mid.pk], scores[low.pk]), (75, 37.5, 18.8))
+
+    def test_blank_gets_zero_and_is_left_out_of_rasch(self):
+        from .services import MIN_RASCH_RESPONDENTS, rasch_rescore
+        patterns = [(1,), (1, 2), (1, 3), (1, 2, 3), (2, 3, 4), (1, 2, 3, 4), (1, 4), (2,)]
+        for n in range(MIN_RASCH_RESPONDENTS):
+            self.finish(100 + n, right=patterns[n % len(patterns)])
+        rasch_rescore(self.exam)
+        with_rasch = dict(Attempt.objects.values_list('pk', 'score'))
+        blank = self.finish(999, blank=True)
+        rasch_rescore(self.exam)
+        scores = dict(Attempt.objects.values_list('pk', 'score'))
+        self.assertEqual(scores.pop(blank.pk), 0)
+        self.assertEqual(scores, with_rasch)  # bo'sh varaq boshqalarning ballini o'zgartirmadi
+        percent_like = {round(75 * a.percent / 100, 1) for a in Attempt.objects.exclude(pk=blank.pk)}
+        self.assertNotEqual(set(scores.values()), percent_like)  # 20 kishida Rasch ishladi
+
+    def test_key_change_in_bot_marks_rescore(self):
+        from tgbot.teacher_handlers import _apply_compact
+        from asgiref.sync import async_to_sync
+        self.finish(1, right=(1,))
+        Exam.objects.filter(pk=self.exam.pk).update(needs_rescore=False)
+        async_to_sync(_apply_compact)(self.exam.pk, 'mcq', '1c')
+        self.exam.refresh_from_db()
+        self.assertTrue(self.exam.needs_rescore)
+        attempt = Attempt.objects.get()
+        self.assertEqual(attempt.correct_items, 0)  # kalit almashgach javob qayta tekshirildi
