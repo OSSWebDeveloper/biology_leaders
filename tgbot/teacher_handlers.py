@@ -10,7 +10,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import (
     BufferedInputFile, CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, Message,
-    ReplyKeyboardMarkup,
+    ReplyKeyboardMarkup, WebAppInfo,
 )
 from asgiref.sync import sync_to_async
 from django.conf import settings

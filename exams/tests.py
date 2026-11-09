@@ -131,6 +131,10 @@ class AuthTests(TestCase):
         self.assertIsNone(verify_init_data(signed_init_data(auth_date=int(time.time()) - 90000)))
         self.assertIsNone(verify_init_data(''))
 
+    @override_settings(TEACHER_BOT_TOKEN='555:TEACHER')
+    def test_init_data_from_teacher_bot(self):
+        self.assertEqual(verify_init_data(signed_init_data(token='555:TEACHER'))['id'], 777)
+
     def _post(self, data):
         return self.client.post(reverse('tg_auth'), json.dumps({'init_data': data}), content_type='application/json')
 

@@ -1,5 +1,12 @@
 # Versiyalar tarixi
 
+## 1.14.0 — 2026-11-09
+
+O'qituvchi botida Web App
+
+- O'qituvchi botining menyu tugmasi «O'qituvchi» va /start dagi «🎓 O'qituvchi ilovasi» tugmasi /ustoz/ ni Web App qilib ochadi
+- Sayt initData imzosini o'quvchi va o'qituvchi botlari tokeni bilan tekshiradi
+
 ## 1.13.0 — 2026-11-09
 
 Tugash vaqti avtomatik, «Fan» olib tashlandi

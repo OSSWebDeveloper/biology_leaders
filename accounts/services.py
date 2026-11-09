@@ -19,9 +19,15 @@ _LOGIN_SALT = 'accounts.login-link'
 def verify_init_data(init_data, bot_token=None, max_age=INIT_DATA_MAX_AGE):
     """Telegram Web App initData imzosini tekshiradi; to'g'ri bo'lsa user lug'atini qaytaradi.
 
+    Token berilmasa o'quvchi va o'qituvchi botlari tokeni bilan sinab ko'riladi (ikkalasida Web App bor).
     Algoritm: https://core.telegram.org/bots/webapps#validating-data-received-via-the-mini-app
     """
-    bot_token = bot_token or settings.BOT_TOKEN
+    if bot_token is None:
+        for token in (settings.BOT_TOKEN, settings.TEACHER_BOT_TOKEN):
+            user = verify_init_data(init_data, token, max_age) if token else None
+            if user:
+                return user
+        return None
     if not init_data or not bot_token:
         return None
     pairs = dict(parse_qsl(init_data, keep_blank_values=True))

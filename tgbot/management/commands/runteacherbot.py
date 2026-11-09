@@ -3,7 +3,7 @@ import logging
 
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
-from aiogram.types import BotCommand
+from aiogram.types import BotCommand, MenuButtonWebApp, WebAppInfo
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 
@@ -26,6 +26,9 @@ async def run():
         BotCommand(command='kalit', description="Javoblarni o'zgartirish: /kalit KOD"),
         BotCommand(command='bekor', description='Bekor qilish'),
     ])
+    if settings.WEBAPP_IS_HTTPS:
+        await bot.set_chat_menu_button(menu_button=MenuButtonWebApp(
+            text="O'qituvchi", web_app=WebAppInfo(url=settings.WEBAPP_URL + '/ustoz/')))
     dp = Dispatcher(storage=MemoryStorage())
     dp.include_router(router)
     me = await bot.get_me()
