@@ -2,7 +2,7 @@
 {% block title %}{{ title }}{% endblock %}
 {% block content %}
 <h1>{{ title }}</h1>
-<form method="post" class="card form">{% csrf_token %}
+<form method="post" enctype="multipart/form-data" class="card form">{% csrf_token %}
   {{ form.as_div }}
   <button class="btn block">Saqlash</button>
 </form>

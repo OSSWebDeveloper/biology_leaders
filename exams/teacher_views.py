@@ -35,6 +35,16 @@ def _group_or_403(request, pk):
     return group
 
 
+def _save_test_file(request, exam, form):
+    """Formadagi test fayli: savollar soni formada berilgan, shuning uchun fayl faqat saqlanadi."""
+    upload = form.cleaned_data.get('test_file')
+    if upload:
+        try:
+            messages.success(request, attach_test_file(exam, upload))
+        except PdfImportError as exc:
+            messages.error(request, str(exc))
+
+
 # ---------- Testlar ----------
 
 @teacher_required
@@ -49,13 +59,14 @@ def t_exams(request):
 
 @teacher_required
 def t_exam_new(request):
-    form = ExamForm(request.POST or None)
+    form = ExamForm(request.POST or None, request.FILES or None)
     if request.method == 'POST' and form.is_valid():
         exam = form.save(commit=False)
         exam.created_by = request.user
         exam.save()
         create_answer_sheet(exam, form.counts)
-        return redirect('t_pdf', pk=exam.pk)
+        _save_test_file(request, exam, form)
+        return redirect('t_exam', pk=exam.pk)
     return render(request, 'teacher/form.html', {'form': form, 'title': 'Yangi test', 'tab': 'teacher',
                                                  'back': 't_exams'})
 
@@ -63,10 +74,11 @@ def t_exam_new(request):
 @teacher_required
 def t_exam_edit(request, pk):
     exam = _exam_or_403(request, pk)
-    form = ExamForm(request.POST or None, instance=exam)
+    form = ExamForm(request.POST or None, request.FILES or None, instance=exam)
     if request.method == 'POST' and form.is_valid():
         form.save()
         set_question_counts(exam, form.counts)
+        _save_test_file(request, exam, form)
         messages.success(request, 'Saqlandi')
         return redirect('t_exam', pk=pk)
     return render(request, 'teacher/form.html', {'form': form, 'title': 'Test sozlamalari', 'exam': exam, 'tab': 'teacher'})

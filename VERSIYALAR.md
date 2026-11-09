@@ -1,5 +1,13 @@
 # Versiyalar tarixi
 
+## 1.15.0 — 2026-11-09
+
+Test faylini yaratish sahifasida biriktirish
+
+- «Yangi test» va «Test sozlamalari» formasida ixtiyoriy «Test fayli (PDF yoki Word)» maydoni
+- Savollar soni formadan olinadi, fayl faqat saqlanadi (PDF dan «JAVOBLAR» sahifasi olib tashlanadi)
+- Yangi test saqlangach to'g'ridan-to'g'ri test sahifasiga (javoblar kaliti) o'tadi
+
 ## 1.14.0 — 2026-11-09
 
 O'qituvchi botida Web App

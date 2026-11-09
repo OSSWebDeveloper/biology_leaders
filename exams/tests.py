@@ -449,6 +449,25 @@ class RoleTests(TestCase):
         exam = Exam.objects.latest('pk')
         self.assertEqual(self.kinds(exam), [(1, 'mcq'), (2, 'mcq'), (3, 'matching')])
 
+    def test_new_exam_with_word_file(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        self.client.force_login(self.teacher)
+        self.assertContains(self.client.get(reverse('t_exam_new')), 'id_test_file')
+        upload = SimpleUploadedFile('test.docx', b'PK word')
+        r = self.client.post(reverse('t_exam_new'), {**self._settings(count_mcq=2, count_matching=0, count_open=1),
+                                                     'test_file': upload})
+        exam = Exam.objects.latest('pk')
+        self.assertRedirects(r, reverse('t_exam', args=[exam.pk]))
+        self.assertTrue(exam.attachment.name.endswith('.docx'))
+        self.assertEqual(exam.questions.count(), 3)  # fayl soni o'zgartirmaydi
+        exam.attachment.delete(save=False)
+
+    def test_bad_file_rejected(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        self.client.force_login(self.teacher)
+        r = self.client.post(reverse('t_exam_new'), {**self._settings(), 'test_file': SimpleUploadedFile('a.txt', b'x')})
+        self.assertContains(r, 'Faqat PDF yoki Word')
+
     def test_exam_form_requires_start_and_end(self):
         self.client.force_login(self.teacher)
         url = reverse('t_exam_edit', args=[self.exam.pk])

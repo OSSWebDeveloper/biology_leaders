@@ -18,6 +18,9 @@ class ExamForm(forms.ModelForm):
     count_mcq = forms.IntegerField(min_value=0, max_value=99)
     count_matching = forms.IntegerField(min_value=0, max_value=99)
     count_open = forms.IntegerField(min_value=0, max_value=99)
+    test_file = forms.FileField(
+        label='Test fayli (PDF yoki Word)', required=False,
+        help_text="Guruhga shu fayl yuboriladi. PDF dagi «JAVOBLAR» sahifasi o'quvchilarga ketmaydi.")
 
     class Meta:
         model = Exam
@@ -43,6 +46,9 @@ class ExamForm(forms.ModelForm):
             field = self.fields[f'count_{kind}']
             field.label = label
             field.initial = current.get(kind, 0)
+
+    def clean_test_file(self):
+        return validate_test_file(self.cleaned_data.get('test_file'))
 
     @property
     def counts(self):
@@ -101,15 +107,20 @@ class PdfImportForm(forms.Form):
     replace = forms.BooleanField(label="Mavjud savollarni almashtirish", required=False)
 
     def clean_pdf(self):
-        pdf = self.cleaned_data['pdf']
-        if pdf.size > MAX_PDF_MB * 1024 * 1024:
-            raise forms.ValidationError(f'Fayl {MAX_PDF_MB} MB dan oshmasin')
-        name = pdf.name.lower()
-        if not name.endswith(('.pdf', '.doc', '.docx')):
-            raise forms.ValidationError('Faqat PDF yoki Word fayl')
-        if not name.endswith('.pdf'):
-            head = pdf.read(4)
-            pdf.seek(0)
-            if head not in WORD_SIGNATURES:
-                raise forms.ValidationError("Word faylni o'qib bo'lmadi")
+        return validate_test_file(self.cleaned_data['pdf'])
+
+
+def validate_test_file(pdf):
+    if not pdf:
         return pdf
+    if pdf.size > MAX_PDF_MB * 1024 * 1024:
+        raise forms.ValidationError(f'Fayl {MAX_PDF_MB} MB dan oshmasin')
+    name = pdf.name.lower()
+    if not name.endswith(('.pdf', '.doc', '.docx')):
+        raise forms.ValidationError('Faqat PDF yoki Word fayl')
+    if not name.endswith('.pdf'):
+        head = pdf.read(4)
+        pdf.seek(0)
+        if head not in WORD_SIGNATURES:
+            raise forms.ValidationError("Word faylni o'qib bo'lmadi")
+    return pdf
