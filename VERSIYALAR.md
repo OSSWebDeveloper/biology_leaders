@@ -1,5 +1,13 @@
 # Versiyalar tarixi
 
+## 1.16.0 — 2026-11-09
+
+Kirish kodi test formasida
+
+- «Yangi test» va «Test sozlamalari» formasida «Kirish kodi» (3–8 lotin harfi yoki raqam, band bo'lsa xato)
+- Yangi testda «Test vaqti (daqiqa)» bo'sh turadi, o'qituvchi o'zi yozadi
+- Test sahifasidan «Kalitsiz savollar» ogohlantirishi, «Fayl yuklash» va «Natijalar» tugmalari olib tashlandi
+
 ## 1.15.0 — 2026-11-09
 
 Test faylini yaratish sahifasida biriktirish

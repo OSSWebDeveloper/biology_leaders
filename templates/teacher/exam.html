@@ -14,15 +14,12 @@
     <tr><td class="muted">Tugash</td><td class="right">{{ exam.closes_at|date:"d.m.Y H:i"|default:"kiritilmagan" }}</td></tr>
     <tr><td class="muted">Test fayli</td><td class="right">{% if exam.attachment %}<a href="{{ exam.attachment.url }}">Yuklangan</a>{% else %}yuklanmagan{% endif %}</td></tr>
   </table>
-  {% if missing %}<div class="msg mt mb0" style="background:var(--warn-bg);color:var(--warn)">Kalitsiz savollar: {{ missing|join:", " }}</div>{% endif %}
   <div class="row wrapx mt">
     <form method="post" action="{% url 't_publish' exam.pk %}">{% csrf_token %}
       <button class="btn sm {% if exam.is_published %}ghost{% endif %}">{% if exam.is_published %}E'londan olish{% else %}E'lon qilish{% endif %}</button></form>
     {% if exam.is_published %}<form method="post" action="{% url 't_send' exam.pk %}">{% csrf_token %}<button class="btn sm">📤 Guruh xabarini botga yuborish</button></form>{% endif %}
     <a class="btn ghost sm" href="{% url 't_exam_edit' exam.pk %}">Sozlamalar</a>
-    <a class="btn ghost sm" href="{% url 't_pdf' exam.pk %}">Fayl yuklash</a>
     <a class="btn ghost sm" href="{% url 't_question_new' exam.pk %}">+ Savol</a>
-    <a class="btn ghost sm" href="{% url 't_results' exam.pk %}">Natijalar ({{ attempt_count }})</a>
     {% if not attempt_count %}<form method="post" action="{% url 't_exam_delete' exam.pk %}" data-confirm="Test butunlay o'chirilsinmi?">{% csrf_token %}<button class="btn danger sm">O'chirish</button></form>{% endif %}
   </div>
 </div>
@@ -55,6 +52,6 @@
   <div class="savebar"><button class="btn block">Kalitni saqlash</button></div>
 </form>
 {% else %}
-<div class="card empty-state">Savollar yo'q. Test faylini yuklang yoki savolni qo'lda qo'shing.</div>
+<div class="card empty-state">Savollar yo'q. Sozlamalarda savollar sonini kiriting.</div>
 {% endif %}
 {% endblock %}

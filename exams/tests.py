@@ -415,7 +415,7 @@ class RoleTests(TestCase):
         self.assertEqual(self.client.get(reverse('a_users')).status_code, 404)
 
     def _settings(self, **extra):
-        return {'title': 'T', 'duration_min': 10, 'count_mcq': 1,
+        return {'title': 'T', 'code': 'KOD1', 'duration_min': 10, 'count_mcq': 1,
                 'count_matching': 1, 'count_open': 1, 'opens_at': '2030-01-01T09:00', **extra}
 
     def kinds(self, exam):
@@ -461,6 +461,26 @@ class RoleTests(TestCase):
         self.assertTrue(exam.attachment.name.endswith('.docx'))
         self.assertEqual(exam.questions.count(), 3)  # fayl soni o'zgartirmaydi
         exam.attachment.delete(save=False)
+
+    def test_new_form_code_and_empty_duration(self):
+        self.client.force_login(self.teacher)
+        form = self.client.get(reverse('t_exam_new')).context['form']
+        self.assertIsNone(form.initial.get('duration_min'))
+        self.assertEqual(list(form.fields)[:3], ['title', 'code', 'description'])
+        self.client.post(reverse('t_exam_new'), self._settings(code=' abc12 '))
+        self.assertEqual(Exam.objects.latest('pk').access_code, 'ABC12')
+        r = self.client.post(reverse('t_exam_new'), self._settings(code='ABC12'))
+        self.assertContains(r, 'boshqa testda band')
+        r = self.client.post(reverse('t_exam_new'), self._settings(code='a b'))
+        self.assertContains(r, "lotin harfi")
+
+    def test_exam_page_without_extra_buttons(self):
+        self.client.force_login(self.teacher)
+        Question.objects.filter(exam=self.exam).update(correct='', answer_a='')
+        r = self.client.get(reverse('t_exam', args=[self.exam.pk]))
+        self.assertNotContains(r, 'Kalitsiz savollar')
+        self.assertNotContains(r, 'Fayl yuklash')
+        self.assertNotContains(r, reverse('t_results', args=[self.exam.pk]))
 
     def test_bad_file_rejected(self):
         from django.core.files.uploadedfile import SimpleUploadedFile

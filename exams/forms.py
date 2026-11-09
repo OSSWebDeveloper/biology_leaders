@@ -1,6 +1,8 @@
 import datetime
+import re
 
 from django import forms
+from django.core.validators import MinValueValidator
 
 from .models import Exam, Question
 from .services import DEFAULT_SHEET
@@ -13,14 +15,22 @@ COUNT_FIELDS = (('mcq', "4 variantli savollar soni"), ('matching', "6 variantli 
                 ('open', "Ochiq savollar soni"))
 
 
+CODE_PATTERN = re.compile(r'[A-Z0-9]{3,8}')
+
+
 class ExamForm(forms.ModelForm):
     """Savollar soni maydonlari modelda emas: saqlangach set_question_counts bilan qo'llanadi."""
+    code = forms.CharField(label='Kirish kodi', max_length=8,
+                           help_text="O'quvchi testga shu kod bilan kiradi: 3–8 ta lotin harfi yoki raqam")
     count_mcq = forms.IntegerField(min_value=0, max_value=99)
     count_matching = forms.IntegerField(min_value=0, max_value=99)
     count_open = forms.IntegerField(min_value=0, max_value=99)
     test_file = forms.FileField(
         label='Test fayli (PDF yoki Word)', required=False,
         help_text="Guruhga shu fayl yuboriladi. PDF dagi «JAVOBLAR» sahifasi o'quvchilarga ketmaydi.")
+
+    field_order = ['title', 'code', 'description', 'duration_min', 'opens_at',
+                   'count_mcq', 'count_matching', 'count_open', 'show_answers', 'test_file']
 
     class Meta:
         model = Exam
@@ -39,6 +49,11 @@ class ExamForm(forms.ModelForm):
         opens.label = 'Boshlanish vaqti'
         opens.help_text = "Tugash vaqti avtomatik: boshlanish + test vaqti"
         self.fields['duration_min'].label = 'Test vaqti (daqiqa)'
+        self.fields['duration_min'].validators.append(MinValueValidator(1))
+        if self.instance.pk:
+            self.fields['code'].initial = self.instance.access_code
+        else:
+            self.initial['duration_min'] = None  # o'qituvchi o'zi yozadi
         current = DEFAULT_SHEET
         if self.instance.pk:
             current = {kind: self.instance.questions.filter(kind=kind).count() for kind, _ in COUNT_FIELDS}
@@ -46,6 +61,18 @@ class ExamForm(forms.ModelForm):
             field = self.fields[f'count_{kind}']
             field.label = label
             field.initial = current.get(kind, 0)
+
+    def clean_code(self):
+        code = self.cleaned_data['code'].strip().upper()
+        if not CODE_PATTERN.fullmatch(code):
+            raise forms.ValidationError("3–8 ta lotin harfi yoki raqam, bo'sh joysiz")
+        if Exam.objects.filter(access_code=code).exclude(pk=self.instance.pk).exists():
+            raise forms.ValidationError('Bu kod boshqa testda band')
+        return code
+
+    def save(self, commit=True):
+        self.instance.access_code = self.cleaned_data['code']
+        return super().save(commit)
 
     def clean_test_file(self):
         return validate_test_file(self.cleaned_data.get('test_file'))

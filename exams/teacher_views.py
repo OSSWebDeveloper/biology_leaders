@@ -104,7 +104,7 @@ def t_exam(request, pk):
         messages.success(request, 'Javoblar kaliti saqlandi')
         return redirect('t_exam', pk=pk)
     return render(request, 'teacher/exam.html', {
-        'exam': exam, 'questions': questions, 'missing': exam.missing_keys(), 'tab': 'teacher',
+        'exam': exam, 'questions': questions, 'tab': 'teacher',
         'attempt_count': exam.attempts.count(),
     })
 
