@@ -2,7 +2,8 @@ import json
 
 from django.contrib import messages
 from django.contrib.auth import login, logout
-from django.http import JsonResponse
+from django.core.exceptions import PermissionDenied
+from django.http import Http404, JsonResponse
 from django.shortcuts import redirect, render
 from django.views.decorators.http import require_POST
 
@@ -40,3 +41,25 @@ def login_link(request, token):
 def logout_view(request):
     logout(request)
     return redirect('home')
+
+
+# Yashirin kirish manzillari: /mrclayd/ — admin (texnik qism), /ustoz/ — o'qituvchi bo'limi.
+# Telegram ichida ochilsa initData bilan kiradi, so'ng rolga qarab yo'naltiriladi.
+ENTRY_TARGETS = {
+    'admin': ('a_dashboard', lambda u: u.is_admin_role, True),
+    'teacher': ('t_exams', lambda u: u.is_teacher, False),
+}
+
+
+def entry(request, target):
+    url_name, allowed, hidden = ENTRY_TARGETS[target]
+    if not request.user.is_authenticated:
+        return render(request, 'landing.html', {'after_login': request.path})
+    user = request.user
+    if user.telegram_id:  # ADMIN_TELEGRAM_IDS ga keyin qo'shilgan bo'lsa, rol shu yerda yangilanadi
+        user = get_or_create_tg_user(user.telegram_id)
+    if allowed(user):
+        return redirect(url_name)
+    if hidden:
+        raise Http404
+    raise PermissionDenied

@@ -265,6 +265,26 @@ async def cmd_panel(message: Message):
     )
 
 
+async def _open_section(message: Message, allowed, path, text):
+    """Yashirin bo'limlar: ruxsati yo'q foydalanuvchiga hech narsa qaytarilmaydi."""
+    user = await _user_for(message.from_user)
+    if not allowed(user) or not settings.WEBAPP_IS_HTTPS:
+        return
+    await message.answer(text, reply_markup=InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text='Ochish', web_app=WebAppInfo(url=settings.WEBAPP_URL + path)),
+    ]]))
+
+
+@router.message(Command('mrclayd'))
+async def cmd_mrclayd(message: Message):
+    await _open_section(message, lambda u: u.is_admin_role, reverse('entry_admin'), '⚙️ Texnik qism')
+
+
+@router.message(Command('ustoz'))
+async def cmd_ustoz(message: Message):
+    await _open_section(message, lambda u: u.is_teacher, reverse('entry_teacher'), "🎓 O'qituvchi bo'limi")
+
+
 @router.message(Command('yordam'))
 @router.message(F.text == BTN_HELP)
 async def cmd_help(message: Message):

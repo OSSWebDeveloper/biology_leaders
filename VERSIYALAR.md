@@ -1,5 +1,15 @@
 # Versiyalar tarixi
 
+## 1.9.0 — 2026-11-09
+
+Yashirin kirish manzillari: /mrclayd va /ustoz
+
+- /mrclayd — texnik qism (Boshqaruv): faqat admin; boshqalarga 404, manzil borligi bilinmaydi
+- /ustoz — o'qituvchi bo'limi: o'qituvchi va admin; o'quvchiga ruxsat yo'q
+- Telegram ichida ochilsa initData bilan kiradi va shu bo'limga yo'naltiradi
+- O'quvchi botida /mrclayd va /ustoz buyruqlari bo'limni ochish tugmasini beradi; ruxsati yo'qqa javob yo'q
+- Admin Telegram ID .env dagi ADMIN_TELEGRAM_IDS orqali beriladi
+
 ## 1.8.1 — 2026-11-08
 
 Ball tekshiruvi va savol rasmlari himoyasi tuzatildi

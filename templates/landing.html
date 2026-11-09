@@ -21,7 +21,7 @@
     method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken()},
     body: JSON.stringify({init_data: tg.initData}),
   }).then(r => r.json().catch(() => ({})).then(d => ({ok: r.ok, status: r.status, d}))).then(({ok, status, d}) => {
-    if (ok) location.replace("{% url 'exam_list' %}");
+    if (ok) location.replace("{% if after_login %}{{ after_login|escapejs }}{% else %}{% url 'exam_list' %}{% endif %}");
     else stop(d.error || `Kirib bo'lmadi (xato ${status}). Qayta urinib ko'ring.`);
   }).catch(() => stop("Internet bilan aloqa yo'q. Qayta urinib ko'ring."));
 })();
