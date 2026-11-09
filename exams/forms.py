@@ -1,16 +1,26 @@
 from django import forms
 
 from .models import Exam, Question
+from .services import DEFAULT_SHEET
 
 MAX_PDF_MB = 30
 WORD_SIGNATURES = (b'PK\x03\x04', b'\xd0\xcf\x11\xe0')  # .docx (zip), .doc (OLE)
 
 
+COUNT_FIELDS = (('mcq', "4 variantli savollar soni"), ('matching', "6 variantli savollar soni"),
+                ('open', "Ochiq savollar soni"))
+
+
 class ExamForm(forms.ModelForm):
+    """Savollar soni maydonlari modelda emas: saqlangach set_question_counts bilan qo'llanadi."""
+    count_mcq = forms.IntegerField(min_value=0, max_value=99)
+    count_matching = forms.IntegerField(min_value=0, max_value=99)
+    count_open = forms.IntegerField(min_value=0, max_value=99)
+
     class Meta:
         model = Exam
         fields = ['title', 'subject', 'description', 'duration_min', 'opens_at', 'closes_at',
-                  'max_attempts', 'show_answers', 'weight_mcq', 'weight_matching', 'weight_open']
+                  'show_answers']
         widgets = {
             'description': forms.Textarea(attrs={'rows': 2}),
             'opens_at': forms.DateTimeInput(attrs={'type': 'datetime-local'}, format='%Y-%m-%dT%H:%M'),
@@ -23,9 +33,27 @@ class ExamForm(forms.ModelForm):
             self.fields[name].input_formats = ['%Y-%m-%dT%H:%M']
             self.fields[name].required = True
             self.fields[name].label = label
+        current = DEFAULT_SHEET
+        if self.instance.pk:
+            current = {kind: self.instance.questions.filter(kind=kind).count() for kind, _ in COUNT_FIELDS}
+        for kind, label in COUNT_FIELDS:
+            field = self.fields[f'count_{kind}']
+            field.label = label
+            field.initial = current.get(kind, 0)
+
+    @property
+    def counts(self):
+        return {kind: self.cleaned_data[f'count_{kind}'] for kind, _ in COUNT_FIELDS}
 
     def clean(self):
         data = super().clean()
+        if all(f'count_{kind}' in data for kind, _ in COUNT_FIELDS):
+            if not any(data[f'count_{kind}'] for kind, _ in COUNT_FIELDS):
+                raise forms.ValidationError("Kamida bitta savol bo'lsin")
+            if self.instance.pk and self.instance.attempts.exists():
+                current = {kind: self.instance.questions.filter(kind=kind).count() for kind, _ in COUNT_FIELDS}
+                if self.counts != current:
+                    raise forms.ValidationError("Testni yechganlar bor: savollar sonini o'zgartirib bo'lmaydi")
         opens, closes = data.get('opens_at'), data.get('closes_at')
         if opens and closes and closes <= opens:
             self.add_error('closes_at', "Tugash vaqti boshlanishdan keyin bo'lsin")

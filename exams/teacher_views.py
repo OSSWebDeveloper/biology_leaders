@@ -18,7 +18,7 @@ from . import stats
 from .forms import ExamForm, PdfImportForm, QuestionForm
 from .models import Answer, Attempt, Exam, Question
 from .pdf_import import PdfImportError
-from .services import attach_test_file, discard_exam, regrade_exam
+from .services import attach_test_file, create_answer_sheet, discard_exam, regrade_exam, set_question_counts
 
 
 def _exam_or_403(request, pk):
@@ -54,6 +54,7 @@ def t_exam_new(request):
         exam = form.save(commit=False)
         exam.created_by = request.user
         exam.save()
+        create_answer_sheet(exam, form.counts)
         return redirect('t_pdf', pk=exam.pk)
     return render(request, 'teacher/form.html', {'form': form, 'title': 'Yangi test', 'tab': 'teacher',
                                                  'back': 't_exams'})
@@ -65,8 +66,7 @@ def t_exam_edit(request, pk):
     form = ExamForm(request.POST or None, instance=exam)
     if request.method == 'POST' and form.is_valid():
         form.save()
-        if exam.attempts.filter(finished_at__isnull=False).exists():
-            regrade_exam(exam)  # vaznlar o'zgargan bo'lishi mumkin
+        set_question_counts(exam, form.counts)
         messages.success(request, 'Saqlandi')
         return redirect('t_exam', pk=pk)
     return render(request, 'teacher/form.html', {'form': form, 'title': 'Test sozlamalari', 'exam': exam, 'tab': 'teacher'})

@@ -1,5 +1,15 @@
 # Versiyalar tarixi
 
+## 1.12.0 — 2026-11-09
+
+Test sozlamalarida savollar soni
+
+- «Urinishlar soni» maydoni olib tashlandi (test bir marta yechiladi, o'quvchi sahifasida ham ko'rsatilmaydi)
+- Uchta «vazn» maydoni o'rniga: 4 variantli, 6 variantli va ochiq savollar soni
+- Son o'zgarsa savollar oxiridan qo'shiladi yoki o'chiriladi, kiritilgan kalitlar saqlanadi, raqamlar qayta tartiblanadi
+- Testni yechganlar bo'lsa savollar sonini o'zgartirib bo'lmaydi
+- Saytda yangi test yaratilganda javob varag'i shu sonlar bilan darhol yaratiladi
+
 ## 1.11.0 — 2026-11-09
 
 Brauzerda parol bilan kirish

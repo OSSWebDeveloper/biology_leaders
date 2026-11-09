@@ -153,6 +153,27 @@ def create_answer_sheet(exam, counts=None):
                                  for n, kind in enumerate(kinds, 1))
 
 
+def set_question_counts(exam, counts):
+    """Savollar sonini turlar bo'yicha moslaydi: kam bo'lsa oxiriga qo'shadi, ko'p bo'lsa oxiridan
+    o'chiradi, so'ng 4 variantli, 6 variantli, ochiq tartibida qayta raqamlaydi. Kalitlar saqlanadi."""
+    kept = []
+    for kind in ('mcq', 'matching', 'open'):
+        existing = list(exam.questions.filter(kind=kind).order_by('number'))
+        need = counts.get(kind, 0)
+        for question in existing[need:]:
+            question.image.delete(save=False)
+            question.delete()
+        kept += existing[:need]
+        kept += [Question(exam=exam, kind=kind, two_parts=False) for _ in range(need - len(existing))]
+    with transaction.atomic():
+        top = (exam.questions.aggregate(m=Max('number'))['m'] or 0) + 1000
+        for i, question in enumerate(q for q in kept if q.pk):  # raqam to'qnashmasin
+            Question.objects.filter(pk=question.pk).update(number=top + i)
+        for number, question in enumerate(kept, 1):
+            question.number = number
+            question.save()
+
+
 def save_test_file(exam, extension, data):
     """Faylni o'qimasdan, o'zgarishsiz saqlaydi."""
     if exam.attachment:

@@ -12,7 +12,6 @@
     {% if counts.open %}<tr><td class="muted">Yozma</td><td class="right">{{ counts.open }} ta</td></tr>{% endif %}
     {% if exam.opens_at %}<tr><td class="muted">Boshlanish</td><td class="right">{{ exam.opens_at|date:"d.m.Y H:i" }}</td></tr>{% endif %}
     {% if exam.closes_at %}<tr><td class="muted">Tugash</td><td class="right">{{ exam.closes_at|date:"d.m.Y H:i" }}</td></tr>{% endif %}
-    {% if exam.max_attempts %}<tr><td class="muted">Urinishlar</td><td class="right">{{ exam.max_attempts }} ta</td></tr>{% endif %}
   </table>
 </div>
 {% if active %}

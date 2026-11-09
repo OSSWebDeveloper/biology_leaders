@@ -411,9 +411,38 @@ class RoleTests(TestCase):
         self.assertEqual(self.client.get(reverse('a_users')).status_code, 404)
 
     def _settings(self, **extra):
-        return {'title': 'T', 'subject': 'M', 'duration_min': 10, 'max_attempts': 1, 'weight_mcq': 1,
-                'weight_matching': 1, 'weight_open': 1, 'opens_at': '2030-01-01T09:00',
+        return {'title': 'T', 'subject': 'M', 'duration_min': 10, 'count_mcq': 1,
+                'count_matching': 1, 'count_open': 1, 'opens_at': '2030-01-01T09:00',
                 'closes_at': '2030-01-01T12:00', **extra}
+
+    def kinds(self, exam):
+        return list(exam.questions.order_by('number').values_list('number', 'kind'))
+
+    def test_edit_counts_adds_removes_and_renumbers_keeping_keys(self):
+        self.client.force_login(self.teacher)
+        url = reverse('t_exam_edit', args=[self.exam.pk])
+        r = self.client.get(url)
+        self.assertContains(r, '4 variantli savollar soni')
+        self.assertNotContains(r, 'vazni')
+        self.assertNotContains(r, 'Urinishlar')
+        self.assertEqual(self.client.post(url, self._settings(count_mcq=3, count_matching=0, count_open=2)).status_code, 302)
+        self.assertEqual(self.kinds(self.exam), [(1, 'mcq'), (2, 'mcq'), (3, 'mcq'), (4, 'open'), (5, 'open')])
+        self.assertEqual(self.exam.questions.get(number=1).correct, 'B')  # eski kalit qoldi
+        self.assertEqual(self.exam.questions.get(number=4).answer_a, '2√5')
+
+    def test_counts_locked_after_attempts(self):
+        self.client.force_login(self.teacher)
+        Attempt.objects.create(exam=self.exam, student=self.student, deadline=timezone.now())
+        url = reverse('t_exam_edit', args=[self.exam.pk])
+        r = self.client.post(url, self._settings(count_mcq=5))
+        self.assertContains(r, "sonini o")
+        self.assertEqual(self.client.post(url, self._settings()).status_code, 302)  # son o'zgarmasa bo'ladi
+
+    def test_new_exam_creates_sheet(self):
+        self.client.force_login(self.teacher)
+        self.client.post(reverse('t_exam_new'), self._settings(count_mcq=2, count_matching=1, count_open=0))
+        exam = Exam.objects.latest('pk')
+        self.assertEqual(self.kinds(exam), [(1, 'mcq'), (2, 'mcq'), (3, 'matching')])
 
     def test_exam_form_requires_start_and_end(self):
         self.client.force_login(self.teacher)
