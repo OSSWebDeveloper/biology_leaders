@@ -411,9 +411,8 @@ class RoleTests(TestCase):
         self.assertEqual(self.client.get(reverse('a_users')).status_code, 404)
 
     def _settings(self, **extra):
-        return {'title': 'T', 'subject': 'M', 'duration_min': 10, 'count_mcq': 1,
-                'count_matching': 1, 'count_open': 1, 'opens_at': '2030-01-01T09:00',
-                'closes_at': '2030-01-01T12:00', **extra}
+        return {'title': 'T', 'duration_min': 10, 'count_mcq': 1,
+                'count_matching': 1, 'count_open': 1, 'opens_at': '2030-01-01T09:00', **extra}
 
     def kinds(self, exam):
         return list(exam.questions.order_by('number').values_list('number', 'kind'))
@@ -425,6 +424,8 @@ class RoleTests(TestCase):
         self.assertContains(r, '4 variantli savollar soni')
         self.assertNotContains(r, 'vazni')
         self.assertNotContains(r, 'Urinishlar')
+        self.assertNotContains(r, 'id_subject')
+        self.assertNotContains(r, 'id_closes_at')
         self.assertEqual(self.client.post(url, self._settings(count_mcq=3, count_matching=0, count_open=2)).status_code, 302)
         self.assertEqual(self.kinds(self.exam), [(1, 'mcq'), (2, 'mcq'), (3, 'mcq'), (4, 'open'), (5, 'open')])
         self.assertEqual(self.exam.questions.get(number=1).correct, 'B')  # eski kalit qoldi
@@ -448,13 +449,11 @@ class RoleTests(TestCase):
         self.client.force_login(self.teacher)
         url = reverse('t_exam_edit', args=[self.exam.pk])
         missing = self._settings()
-        del missing['closes_at']
+        del missing['opens_at']
         self.assertEqual(self.client.post(url, missing).status_code, 200)
-        reversed_times = self._settings(closes_at='2029-01-01T09:00')
-        self.assertEqual(self.client.post(url, reversed_times).status_code, 200)
         self.assertEqual(self.client.post(url, self._settings(is_public='on')).status_code, 302)
         self.exam.refresh_from_db()
-        self.assertIsNotNone(self.exam.closes_at)
+        self.assertEqual(self.exam.closes_at - self.exam.opens_at, timedelta(minutes=10))  # avtomatik
         self.assertFalse(self.exam.is_public)
 
     def test_publish_rules(self):

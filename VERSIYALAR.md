@@ -1,5 +1,12 @@
 # Versiyalar tarixi
 
+## 1.13.0 — 2026-11-09
+
+Tugash vaqti avtomatik, «Fan» olib tashlandi
+
+- Test sozlamalarida «Tugash vaqti» maydoni yo'q: boshlanish vaqti + test vaqti (daqiqa) bo'yicha hisoblanadi
+- «Fan» maydoni formadan va o'quvchi sahifasidan olib tashlandi
+
 ## 1.12.0 — 2026-11-09
 
 Test sozlamalarida savollar soni

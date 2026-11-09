@@ -1,3 +1,5 @@
+import datetime
+
 from django import forms
 
 from .models import Exam, Question
@@ -19,20 +21,21 @@ class ExamForm(forms.ModelForm):
 
     class Meta:
         model = Exam
-        fields = ['title', 'subject', 'description', 'duration_min', 'opens_at', 'closes_at',
+        fields = ['title', 'description', 'duration_min', 'opens_at',
                   'show_answers']
         widgets = {
             'description': forms.Textarea(attrs={'rows': 2}),
             'opens_at': forms.DateTimeInput(attrs={'type': 'datetime-local'}, format='%Y-%m-%dT%H:%M'),
-            'closes_at': forms.DateTimeInput(attrs={'type': 'datetime-local'}, format='%Y-%m-%dT%H:%M'),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        for name, label in (('opens_at', 'Boshlanish vaqti'), ('closes_at', 'Tugash vaqti')):
-            self.fields[name].input_formats = ['%Y-%m-%dT%H:%M']
-            self.fields[name].required = True
-            self.fields[name].label = label
+        opens = self.fields['opens_at']
+        opens.input_formats = ['%Y-%m-%dT%H:%M']
+        opens.required = True
+        opens.label = 'Boshlanish vaqti'
+        opens.help_text = "Tugash vaqti avtomatik: boshlanish + test vaqti"
+        self.fields['duration_min'].label = 'Test vaqti (daqiqa)'
         current = DEFAULT_SHEET
         if self.instance.pk:
             current = {kind: self.instance.questions.filter(kind=kind).count() for kind, _ in COUNT_FIELDS}
@@ -54,9 +57,9 @@ class ExamForm(forms.ModelForm):
                 current = {kind: self.instance.questions.filter(kind=kind).count() for kind, _ in COUNT_FIELDS}
                 if self.counts != current:
                     raise forms.ValidationError("Testni yechganlar bor: savollar sonini o'zgartirib bo'lmaydi")
-        opens, closes = data.get('opens_at'), data.get('closes_at')
-        if opens and closes and closes <= opens:
-            self.add_error('closes_at', "Tugash vaqti boshlanishdan keyin bo'lsin")
+        opens, duration = data.get('opens_at'), data.get('duration_min')
+        if opens and duration:
+            self.instance.closes_at = opens + datetime.timedelta(minutes=duration)
         return data
 
 
