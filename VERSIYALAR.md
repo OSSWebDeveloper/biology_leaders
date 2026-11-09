@@ -1,5 +1,13 @@
 # Versiyalar tarixi
 
+## 1.11.0 — 2026-11-09
+
+Brauzerda parol bilan kirish
+
+- /mrclayd va /ustoz kompyuter brauzerida parol so'raydi; o'qituvchi boti orqali tasdiqlash olib tashlandi
+- Parol admin hisobining Django paroli (bazada hash, kodda yo'q); bir IP dan 5 marta xato — 15 daqiqa kutish
+- Telegram Web App ichida /ustoz avvalgidek o'zi kiradi, /mrclayd esa «Sahifa topilmadi»
+
 ## 1.10.0 — 2026-11-09
 
 Chrome orqali kirish va texnik qism statistikasi

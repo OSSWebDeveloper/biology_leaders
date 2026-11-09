@@ -4,7 +4,6 @@ from . import views
 
 urlpatterns = [
     path('auth/telegram/', views.tg_auth, name='tg_auth'),
-    path('kirish/holat/', views.browser_login_status, name='browser_login_status'),
     path('kirish/<str:token>/', views.login_link, name='login_link'),
     path('chiqish/', views.logout_view, name='logout'),
     path('mrclayd/', views.entry, {'target': 'admin'}, name='entry_admin'),

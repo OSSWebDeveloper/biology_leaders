@@ -4,14 +4,12 @@ from django.contrib import messages
 from django.contrib.auth import login, logout
 from django.core.exceptions import PermissionDenied
 from django.http import Http404, JsonResponse
-from django.conf import settings
+from django.core.cache import cache
 from django.shortcuts import redirect, render
-from django.urls import reverse
 from django.views.decorators.http import require_POST
 
-from .services import (
-    check_login_token, claim_browser_login, create_browser_login, get_or_create_tg_user, verify_init_data,
-)
+from .models import User
+from .services import check_login_token, get_or_create_tg_user, verify_init_data
 
 
 @require_POST
@@ -73,22 +71,37 @@ def entry(request, target):
         if browser_only:
             raise Http404
         raise PermissionDenied
-    token = create_browser_login()
-    request.session['browser_login_token'] = token
-    bot = settings.TEACHER_BOT_USERNAME
+    if request.method == 'POST':
+        error = _password_login(request)
+        if error is None:
+            return redirect(request.path)
+    else:
+        error = None
     return render(request, 'accounts/browser_login.html', {
-        'target': target, 'browser_only': browser_only, 'hide_nav': True,
-        'bot_username': bot, 'bot_link': f'https://t.me/{bot}?start=login_{token}' if bot else '',
-        'status_url': reverse('browser_login_status'),
-    })
+        'browser_only': browser_only, 'hide_nav': True, 'error': error})
 
 
-def browser_login_status(request):
-    """Kirish sahifasi shu yerni so'rab turadi; o'qituvchi botida tasdiqlansa sessiya ochiladi."""
-    token = request.session.get('browser_login_token')
-    user = claim_browser_login(token) if token else None
+MAX_TRIES = 5
+LOCK_SECONDS = 15 * 60
+
+
+def _client_ip(request):
+    forwarded = request.META.get('HTTP_X_FORWARDED_FOR', '')
+    return forwarded.split(',')[0].strip() or request.META.get('REMOTE_ADDR', '')
+
+
+def _password_login(request):
+    """Parol bilan kirish (kompyuter brauzeri). Xato bo'lsa xabar, kirsa None qaytaradi."""
+    key = f'pwd-tries:{_client_ip(request)}'
+    tries = cache.get(key, 0)
+    if tries >= MAX_TRIES:
+        return "Ko'p marta xato kiritildi. 15 daqiqadan keyin urinib ko'ring."
+    password = request.POST.get('password', '')
+    admins = User.objects.filter(role=User.Role.ADMIN, is_active=True)
+    user = next((u for u in admins if password and u.check_password(password)), None)
     if user is None:
-        return JsonResponse({'ok': False})
-    request.session.pop('browser_login_token', None)
+        cache.set(key, tries + 1, LOCK_SECONDS)
+        return "Parol noto'g'ri."
+    cache.delete(key)
     _login_browser(request, user)
-    return JsonResponse({'ok': True})
+    return None

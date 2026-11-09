@@ -75,7 +75,7 @@ p { margin: 0 0 10px; }
 
 /* Formalar */
 label { display: block; font-weight: 500; margin-bottom: 4px; font-size: 14px; }
-input[type=text], input[type=number], input[type=search], input[type=datetime-local], input:not([type]), textarea, select { width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--text); font: inherit; }
+input[type=text], input[type=password], input[type=number], input[type=search], input[type=datetime-local], input:not([type]), textarea, select { width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--text); font: inherit; }
 input:focus, textarea:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 .form > div { margin-bottom: 14px; }
 .form .helptext { display: block; color: var(--muted); font-size: 12px; margin-top: 3px; }
@@ -200,7 +200,8 @@ table.t tr:last-child td { border-bottom: 0; }
 @media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 3s; } }
 
 /* Kirish sahifasi va texnik qism */
-.login-box { width: 100%; max-width: 360px; }
+.login-box { width: 100%; max-width: 340px; }
+.login-box form { display: grid; gap: 10px; margin-top: 6px; }
 .wrap.admin { max-width: 1180px; padding-bottom: 30px; }
 .wrap.admin h2.sec { font-size: 15px; color: var(--muted); font-weight: 600; margin: 18px 0 8px; text-transform: uppercase; letter-spacing: .04em; }
 .stat.live b { color: var(--ok); }

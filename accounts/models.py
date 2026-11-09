@@ -65,11 +65,3 @@ class StudyGroup(models.Model):
 
     def __str__(self):
         return self.name
-
-
-class BrowserLogin(models.Model):
-    """Kompyuter brauzeridan kirish: sahifa token yaratadi, o'qituvchi boti tasdiqlaydi."""
-    token = models.CharField(max_length=64, unique=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    approved_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.CASCADE)
-    used = models.BooleanField(default=False)

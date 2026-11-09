@@ -19,7 +19,6 @@ DEBUG = os.environ.get('DEBUG', '0') == '1'
 
 BOT_TOKEN = os.environ.get('BOT_TOKEN', '')
 BOT_USERNAME = os.environ.get('BOT_USERNAME', '')
-TEACHER_BOT_USERNAME = os.environ.get('TEACHER_BOT_USERNAME', '')
 TEACHER_BOT_TOKEN = os.environ.get('TEACHER_BOT_TOKEN', '')
 WEBAPP_URL = os.environ.get('WEBAPP_URL', '').rstrip('/')
 ADMIN_TELEGRAM_IDS = {int(x) for x in _list('ADMIN_TELEGRAM_IDS')}

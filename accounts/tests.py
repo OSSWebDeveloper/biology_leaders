@@ -1,16 +1,16 @@
 import datetime
 
+from django.core.cache import cache
 from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
 from exams.tests import make_exam
 
-from .models import BrowserLogin, User
-from .services import approve_browser_login, touch_seen
+from .models import User
+from .services import touch_seen
 
 
-@override_settings(TEACHER_BOT_USERNAME='ustoz_bot')
 class EntryLinksTests(TestCase):
     def make(self, role, tg_id):
         return User.objects.create(username=f'u{tg_id}', role=role, telegram_id=tg_id)
@@ -21,12 +21,12 @@ class EntryLinksTests(TestCase):
         session['browser_login'] = True
         session.save()
 
-    def test_anonymous_gets_browser_login_page(self):
+    def test_anonymous_gets_password_page(self):
         for path, browser_only in (('/mrclayd/', True), ('/ustoz/', False)):
             r = self.client.get(path)
             self.assertEqual(r.status_code, 200)
             self.assertEqual(r.context['browser_only'], browser_only)
-            self.assertIn('https://t.me/ustoz_bot?start=login_', r.context['bot_link'])
+            self.assertContains(r, 'type="password"')
 
     def test_admin_in_browser(self):
         self.browser_login(self.make(User.Role.ADMIN, 1))
@@ -56,33 +56,36 @@ class EntryLinksTests(TestCase):
         self.assertRedirects(self.client.get('/mrclayd/'), reverse('a_dashboard'))
 
 
-@override_settings(TEACHER_BOT_USERNAME='ustoz_bot')
-class BrowserLoginFlowTests(TestCase):
+class PasswordLoginTests(TestCase):
     def setUp(self):
         self.admin = User.objects.create(username='a', role=User.Role.ADMIN, telegram_id=10)
-        self.client.get('/mrclayd/')
-        self.token = self.client.session['browser_login_token']
+        self.admin.set_password("to'g'ri-parol")
+        self.admin.save()
+        cache.clear()
 
-    def status(self):
-        return self.client.get(reverse('browser_login_status')).json()['ok']
-
-    def test_pending_then_approved_logs_in_once(self):
-        self.assertFalse(self.status())
-        self.assertTrue(approve_browser_login(self.token, self.admin))
-        self.assertTrue(self.status())
-        self.assertRedirects(self.client.get('/mrclayd/'), reverse('a_dashboard'))
+    def test_correct_password_opens_admin_and_teacher(self):
+        r = self.client.post('/mrclayd/', {'password': "to'g'ri-parol"})
+        self.assertRedirects(r, '/mrclayd/', target_status_code=302)
         self.assertEqual(self.client.get(reverse('a_dashboard')).status_code, 200)
-        self.assertFalse(approve_browser_login(self.token, self.admin))  # ikkinchi marta ishlamaydi
+        self.assertRedirects(self.client.get('/ustoz/'), reverse('t_exams'))
 
-    def test_other_browser_cannot_claim_token(self):
-        approve_browser_login(self.token, self.admin)
-        other = self.client_class()
-        self.assertFalse(other.get(reverse('browser_login_status')).json()['ok'])
+    def test_password_on_ustoz(self):
+        self.client.post('/ustoz/', {'password': "to'g'ri-parol"})
+        self.assertRedirects(self.client.get('/ustoz/'), reverse('t_exams'))
 
-    def test_expired_token(self):
-        BrowserLogin.objects.update(created_at=timezone.now() - datetime.timedelta(minutes=10))
-        self.assertFalse(approve_browser_login(self.token, self.admin))
-        self.assertFalse(self.status())
+    def test_wrong_password_and_lockout(self):
+        for _ in range(5):
+            r = self.client.post('/mrclayd/', {'password': 'xato'})
+            self.assertContains(r, "Parol noto")
+        r = self.client.post('/mrclayd/', {'password': "to'g'ri-parol"})
+        self.assertContains(r, "marta xato kiritildi")
+        self.assertEqual(self.client.get(reverse('a_dashboard')).status_code, 404)
+
+    def test_teacher_password_not_accepted(self):
+        teacher = User.objects.create(username='t', role=User.Role.TEACHER, telegram_id=11)
+        teacher.set_password('ustoz-parol')
+        teacher.save()
+        self.assertContains(self.client.post('/mrclayd/', {'password': 'ustoz-parol'}), "Parol noto")
 
 
 class StatsTests(TestCase):
