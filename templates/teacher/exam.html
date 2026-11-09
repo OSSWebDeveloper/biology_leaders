@@ -12,6 +12,7 @@
     <tr><td class="muted">Kirish kodi</td><td class="right"><b>{{ exam.access_code }}</b></td></tr>
     <tr><td class="muted">Boshlanish</td><td class="right">{{ exam.opens_at|date:"d.m.Y H:i"|default:"kiritilmagan" }}</td></tr>
     <tr><td class="muted">Tugash</td><td class="right">{{ exam.closes_at|date:"d.m.Y H:i"|default:"kiritilmagan" }}</td></tr>
+    <tr><td class="muted">Kanalga e'lon</td><td class="right">{% if exam.channel_posted_at %}<span class="tag ok">yuborildi {{ exam.channel_posted_at|date:"d.m H:i" }}</span>{% elif exam.closes_at and exam.closes_at <= now %}<span class="tag plain">yuborilmagan</span>{% else %}boshlanish vaqtida avtomatik{% if not exam.is_published %}, kalit to'liq bo'lsa e'lon ham qilinadi{% endif %}{% endif %}</td></tr>
     <tr><td class="muted">Test fayli</td><td class="right">{% if exam.attachment %}<a href="{{ exam.attachment.url }}">Yuklangan</a>{% else %}yuklanmagan{% endif %}</td></tr>
   </table>
   <div class="row wrapx mt">

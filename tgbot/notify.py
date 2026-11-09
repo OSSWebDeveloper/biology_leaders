@@ -16,6 +16,30 @@ from django.utils.text import get_valid_filename
 log = logging.getLogger(__name__)
 
 
+def send_text(chat_id, text):
+    """Sinxron matnli xabar; yuborildimi."""
+    payload = {'chat_id': chat_id, 'text': text, 'parse_mode': 'HTML'}
+    request = urllib.request.Request(
+        f'https://api.telegram.org/bot{settings.BOT_TOKEN}/sendMessage',
+        data=json.dumps(payload).encode(), headers={'Content-Type': 'application/json'},
+    )
+    try:
+        urllib.request.urlopen(request, timeout=15).read()
+    except (urllib.error.URLError, OSError) as exc:
+        log.warning('Kanal xabari yuborilmadi: %s', type(exc).__name__)
+        return False
+    return True
+
+
+def channel_announcement(exam, chat_id):
+    """Kanalga e'lon: fayl bo'lsa fayl bilan, bo'lmasa matn."""
+    if getattr(settings, 'NOTIFY_DISABLED', False) or not settings.BOT_TOKEN:
+        return False
+    if exam.attachment:
+        return exam_announcement(exam, chat_id)
+    return send_text(chat_id, announcement_caption(exam))
+
+
 def _post(chat_id, text, reply_markup=None):
     payload = {'chat_id': chat_id, 'text': text, 'parse_mode': 'HTML'}
     if reply_markup:

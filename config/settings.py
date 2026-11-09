@@ -26,6 +26,8 @@ WEBAPP_IS_HTTPS = WEBAPP_URL.startswith('https://')
 # Majburiy obuna: o'quvchi shu kanalga a'zo bo'lmasa bot va testlar ochilmaydi (bo'sh bo'lsa tekshirilmaydi)
 REQUIRED_CHANNEL_ID = os.environ.get('REQUIRED_CHANNEL_ID', '').strip()
 REQUIRED_CHANNEL_URL = os.environ.get('REQUIRED_CHANNEL_URL', '').strip()
+# Test boshlanganda e'lon shu kanalga ketadi (bo'sh bo'lsa majburiy obuna kanali)
+ANNOUNCE_CHANNEL_ID = os.environ.get('ANNOUNCE_CHANNEL_ID', '').strip() or REQUIRED_CHANNEL_ID
 if sys.argv[1:2] == ['test']:  # testlar Telegram'ga so'rov yubormasin
     REQUIRED_CHANNEL_ID = ''
 

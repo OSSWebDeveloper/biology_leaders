@@ -669,3 +669,54 @@ class PdfImportTests(TestCase):
         self.assertEqual(result.slices[3].kind, 'open')
         self.assertEqual(result.mcq_key, {1: 'C', 2: 'A', 3: 'B'})
         self.assertTrue(result.slices[0].png.startswith(b'\x89PNG'))
+
+
+@override_settings(ANNOUNCE_CHANNEL_ID='-100123')
+class AutoPublishTests(TestCase):
+    def setUp(self):
+        from unittest import mock
+        self.teacher = make_user(60, 'teacher')
+        now = timezone.now()
+        self.exam = make_exam(owner=self.teacher, status=Exam.Status.DRAFT,
+                              opens_at=now - timedelta(minutes=1), closes_at=now + timedelta(hours=1))
+        patcher = mock.patch('tgbot.notify.channel_announcement', return_value=True)
+        self.sent = patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def test_draft_published_and_posted_once(self):
+        from .services import publish_due
+        self.assertEqual(publish_due(), 1)
+        self.exam.refresh_from_db()
+        self.assertTrue(self.exam.is_published)
+        self.assertIsNotNone(self.exam.channel_posted_at)
+        self.assertEqual(self.sent.call_args.args[1], '-100123')
+        self.assertEqual(publish_due(), 0)  # ikkinchi marta yuborilmaydi
+        self.assertEqual(self.sent.call_count, 1)
+
+    def test_not_before_start_and_not_without_keys(self):
+        from .services import publish_due
+        Exam.objects.filter(pk=self.exam.pk).update(opens_at=timezone.now() + timedelta(minutes=5))
+        self.assertEqual(publish_due(), 0)
+        Exam.objects.filter(pk=self.exam.pk).update(opens_at=timezone.now() - timedelta(minutes=1))
+        Question.objects.filter(exam=self.exam, number=1).update(correct='')
+        self.assertEqual(publish_due(), 0)
+        self.exam.refresh_from_db()
+        self.assertFalse(self.exam.is_published)
+        self.sent.assert_not_called()
+
+    def test_failed_send_retried(self):
+        from .services import publish_due
+        self.sent.return_value = False
+        self.assertEqual(publish_due(), 0)
+        self.sent.return_value = True
+        self.assertEqual(publish_due(), 1)
+
+    def test_changing_start_time_resets_post(self):
+        Exam.objects.filter(pk=self.exam.pk).update(channel_posted_at=timezone.now())
+        self.client.force_login(self.teacher)
+        self.client.post(reverse('t_exam_edit', args=[self.exam.pk]), {
+            'title': 'T', 'code': self.exam.access_code, 'duration_min': 30, 'opens_at': '2030-01-01T09:00',
+            'count_mcq': 1, 'count_matching': 1, 'count_open': 1})
+        self.exam.refresh_from_db()
+        self.assertIsNone(self.exam.channel_posted_at)
+        self.assertContains(self.client.get(reverse('t_exam', args=[self.exam.pk])), 'boshlanish vaqtida avtomatik')

@@ -8,20 +8,25 @@ from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 
-from exams.services import finish_expired
+from exams.services import finish_expired, publish_due
 from tgbot.handlers import router
 
 log = logging.getLogger(__name__)
 
 
 async def expiry_loop():
-    """Vaqti tugab, o'quvchi qaytib kirmagan urinishlarni yakunlab, natijasini yuboradi."""
+    """Har 30 soniyada: boshlanish vaqti kelgan testlarni e'lon qilib kanalga yuboradi, vaqti tugab
+    o'quvchi qaytib kirmagan urinishlarni yakunlab natijasini yuboradi."""
     while True:
+        try:
+            await sync_to_async(publish_due)()
+        except Exception:
+            log.exception('publish_due xatosi')
         try:
             await sync_to_async(finish_expired)()
         except Exception:
             log.exception('finish_expired xatosi')
-        await asyncio.sleep(60)
+        await asyncio.sleep(30)
 
 
 async def run(drop_webhook):

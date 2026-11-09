@@ -49,6 +49,7 @@ class Exam(models.Model):
     weight_mcq = models.FloatField("Yopiq test vazni (1–32)", default=1)
     weight_matching = models.FloatField("Moslashtirish vazni (33–35)", default=1)
     weight_open = models.FloatField("Yozma band vazni (36–45, a/b har biri)", default=1)
+    channel_posted_at = models.DateTimeField("Kanalga yuborilgan", null=True, blank=True, editable=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

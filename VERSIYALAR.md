@@ -1,5 +1,15 @@
 # Versiyalar tarixi
 
+## 1.17.0 — 2026-11-09
+
+Boshlanish vaqtida avtomatik e'lon va kanalga xabar
+
+- Bot har 30 soniyada tekshiradi: boshlanish vaqti kelgan qoralama test (kaliti to'liq bo'lsa) e'lon qilinadi
+- Shu paytda kanalga bir marta xabar ketadi: test fayli + kirish kodi + vaqtlar (fayl bo'lmasa matn)
+- Kanal: .env ANNOUNCE_CHANNEL_ID, bo'sh bo'lsa majburiy obuna kanali; yuborilmasa tugash vaqtigacha qayta urinadi
+- Boshlanish vaqti o'zgartirilsa yangi vaqtda qayta e'lon qilinadi; test sahifasida «Kanalga e'lon» holati
+- Yangilanishgacha boshlanib bo'lgan testlar kanalga yuborilmaydi
+
 ## 1.16.0 — 2026-11-09
 
 Kirish kodi test formasida

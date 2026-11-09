@@ -72,6 +72,8 @@ class ExamForm(forms.ModelForm):
 
     def save(self, commit=True):
         self.instance.access_code = self.cleaned_data['code']
+        if 'opens_at' in self.changed_data:
+            self.instance.channel_posted_at = None  # yangi vaqtda kanalga qayta e'lon qilinadi
         return super().save(commit)
 
     def clean_test_file(self):

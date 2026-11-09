@@ -2,6 +2,7 @@
 from datetime import timedelta
 
 from django.core.files.base import ContentFile
+from django.conf import settings
 from django.db import IntegrityError, transaction
 from django.db.models import Max
 from django.utils import timezone
@@ -77,6 +78,35 @@ def finish_expired():
         finalize(attempt)
         count += 1
     return count
+
+
+def is_ready(exam):
+    """E'lon qilsa bo'ladimi: savollar bor, kalit to'liq, vaqtlar kiritilgan."""
+    return bool(exam.opens_at and exam.closes_at and exam.questions.exists() and not exam.missing_keys())
+
+
+def publish_due(now=None):
+    """Boshlanish vaqti kelgan testlar: qoralama bo'lsa e'lon qilinadi va kanalga bir marta xabar ketadi.
+
+    Kalit to'liq bo'lmagan qoralama e'lon qilinmaydi (o'qituvchi to'ldirsa, keyingi aylanishda chiqadi).
+    Kanalga yuborilmasa keyingi aylanishda yana urinadi; tugash vaqtidan keyin urinilmaydi.
+    """
+    now = now or timezone.now()
+    channel = settings.ANNOUNCE_CHANNEL_ID
+    due = Exam.objects.filter(opens_at__lte=now, closes_at__gt=now, channel_posted_at__isnull=True)
+    posted = 0
+    for exam in due:
+        if not exam.is_published:
+            if not is_ready(exam):
+                continue
+            exam.status = Exam.Status.PUBLISHED
+            exam.save(update_fields=['status'])
+        if not channel:
+            continue
+        if notify.channel_announcement(exam, channel):
+            Exam.objects.filter(pk=exam.pk).update(channel_posted_at=timezone.now())
+            posted += 1
+    return posted
 
 
 def regrade_exam(exam):
