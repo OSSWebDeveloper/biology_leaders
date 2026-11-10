@@ -1,5 +1,12 @@
 # Versiyalar tarixi
 
+## 1.20.1 — 2026-11-10
+
+Django admin begonalarga yopildi
+
+- /django-admin/ faqat /mrclayd/ orqali parol bilan kirgan adminga ko'rinadi; qolgan hammaga (Telegram ichidagi admin ham) bo'sh 404
+- /django-admin (chiziqchasiz) ham 301 emas, 404 qaytaradi: manzil borligi bilinmaydi
+
 ## 1.20.0 — 2026-11-10
 
 Oddiy brauzerda hech narsa ochilmaydi
