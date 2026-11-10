@@ -588,6 +588,16 @@ class RoleTests(TestCase):
         self.login_admin_browser()
         self.assertEqual(self.client.get(reverse('a_dashboard')).status_code, 200)
 
+    def test_django_admin_hidden_from_everyone_but_browser_admin(self):
+        for url in ('/django-admin/', '/django-admin/login/', '/django-admin'):
+            response = Client().get(url)
+            self.assertEqual(response.status_code, 404, url)
+            self.assertEqual(response.content, b'', url)
+        self.client.force_login(self.admin)  # Telegram Web App sessiyasi: admin bo'lsa ham yopiq
+        self.assertEqual(self.client.get('/django-admin/login/').status_code, 404)
+        self.login_admin_browser()
+        self.assertEqual(self.client.get('/django-admin/login/').status_code, 200)
+
     def test_dashboard_warns_when_bot_is_not_channel_admin(self):
         self.login_admin_browser()
         url = reverse('a_dashboard')
