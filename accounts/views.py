@@ -3,13 +3,20 @@ import json
 from django.contrib import messages
 from django.contrib.auth import login, logout
 from django.core.exceptions import PermissionDenied
-from django.http import Http404, JsonResponse
+from django.http import Http404, HttpResponseNotFound, JsonResponse
 from django.core.cache import cache
 from django.shortcuts import redirect, render
 from django.views.decorators.http import require_POST
 
 from .models import User
 from .services import check_login_token, get_or_create_tg_user, verify_init_data
+
+
+def not_found(request, exception=None):
+    """Kirmagan odamga 404 bo'sh javob (sayt nimaligi bilinmasin); kirganlarga odatdagi sahifa."""
+    if not request.user.is_authenticated:
+        return HttpResponseNotFound()
+    return render(request, '404.html', status=404)
 
 
 @require_POST
@@ -33,7 +40,7 @@ def login_link(request, token):
     """Bot /panel buyrug'i bergan bir martalik havola (kompyuter brauzeri uchun)."""
     user = check_login_token(token)
     if not user:
-        return render(request, 'landing.html', {'link_error': True}, status=403)
+        raise Http404  # begona odamga hech narsa aytilmaydi: bo'sh sahifa
     _login_browser(request, user)
     messages.success(request, f'Xush kelibsiz, {user.display_name}!')
     return redirect('home')

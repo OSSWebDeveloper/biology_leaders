@@ -1,22 +1,23 @@
 {% extends "base.html" %}
+{% comment %}Oddiy brauzerda (Telegram'siz) bu sahifa butunlay bo'sh: nom ham, bot ham ko'rsatilmaydi.{% endcomment %}
+{% block title %}{% endblock %}
 {% block body %}
-<div class="center-screen"><div id="box">
+<div class="center-screen" id="scr" style="display:none"><div id="box">
   <div class="spinner" id="spin"></div>
-  <h1 id="ttl">Milliy Sertifikat</h1>
-  <p class="muted" id="txt">{% if link_error %}Havola eskirgan yoki ishlatilgan. Botda /panel buyrug'ini qayta yuboring.{% else %}Kirilmoqda…{% endif %}</p>
+  <h1 id="ttl"></h1>
+  <p class="muted" id="txt"></p>
 </div></div>
 {% endblock %}
 {% block scripts %}
 <script>
 (function () {
   const tg = window.Telegram && window.Telegram.WebApp;
+  if (!tg || !tg.initData) return;
   const spin = document.getElementById('spin'), txt = document.getElementById('txt');
   const stop = message => { spin.style.display = 'none'; if (message) txt.textContent = message; };
-  {% if link_error %}stop(); return;{% endif %}
-  if (!tg || !tg.initData) {
-    stop("Testlarni yechish uchun ilovani Telegram botidan oching.{% if BOT_USERNAME %} Bot: @{{ BOT_USERNAME }}{% endif %}");
-    return;
-  }
+  document.title = document.getElementById('ttl').textContent = 'Milliy Sertifikat';
+  txt.textContent = 'Kirilmoqda…';
+  document.getElementById('scr').style.display = '';
   fetch("{% url 'tg_auth' %}", {
     method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken()},
     body: JSON.stringify({init_data: tg.initData}),

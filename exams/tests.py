@@ -214,6 +214,23 @@ class AuthTests(TestCase):
         self.assertIsNone(check_login_token(token))
         self.assertIsNone(check_login_token('soxta'))
 
+    def test_plain_browser_sees_nothing(self):
+        # Chrome'da ochilganda sayt nimaligi bilinmasin: nom ham, bot ham, xabar ham yo'q
+        page = self.client.get(reverse('home'))
+        self.assertEqual(page.status_code, 200)
+        visible = page.content.decode().split('<script>')[0]
+        for word in ('Milliy', 'Sertifikat', 'Telegram', 'biology', 'Kirilmoqda'):
+            self.assertNotIn(word, visible.replace('telegram.org/js/telegram-web-app.js', ''))
+        self.assertNotIn('botidan oching', page.content.decode())
+        self.assertIn('<title></title>', visible)
+        self.assertIn('id="scr" style="display:none"', visible)
+        for url in ('/yoq-sahifa/', reverse('login_link', args=['soxta']), reverse('a_dashboard')):
+            response = self.client.get(url)
+            self.assertEqual(response.status_code, 404, url)
+            self.assertEqual(response.content, b'', url)
+        self.client.force_login(make_user(1))
+        self.assertContains(self.client.get('/yoq-sahifa/'), 'Topilmadi', status_code=404)
+
 
 @override_settings(NOTIFY_DISABLED=True)
 class FlowTests(TestCase):
