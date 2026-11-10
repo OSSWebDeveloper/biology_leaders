@@ -1,5 +1,13 @@
 # Versiyalar tarixi
 
+## 1.20.0 — 2026-11-10
+
+Oddiy brauzerda hech narsa ochilmaydi
+
+- Bosh sahifa Telegram'dan tashqarida (Chrome va boshqalar) butunlay bo'sh: nom, bot nomi va «Telegram botidan oching» yozuvi olib tashlandi
+- Mavjud bo'lmagan manzillar va eskirgan kirish havolasi kirmagan odamga bo'sh 404 qaytaradi
+- Telegram Web App ichida hammasi avvalgidek ishlaydi; /mrclayd va /ustoz parol sahifalari o'zgarmadi
+
 ## 1.19.0 — 2026-11-10
 
 Texnik qismda majburiy obuna holati
