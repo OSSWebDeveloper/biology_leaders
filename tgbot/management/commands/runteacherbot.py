@@ -6,6 +6,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import BotCommand, MenuButtonWebApp, WebAppInfo
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
+from django.urls import reverse
 
 from tgbot.teacher_handlers import router
 
@@ -28,7 +29,7 @@ async def run():
     ])
     if settings.WEBAPP_IS_HTTPS:
         await bot.set_chat_menu_button(menu_button=MenuButtonWebApp(
-            text="O'qituvchi", web_app=WebAppInfo(url=settings.WEBAPP_URL + '/ustoz/')))
+            text="O'qituvchi", web_app=WebAppInfo(url=settings.WEBAPP_URL + reverse('entry_teacher'))))
     dp = Dispatcher(storage=MemoryStorage())
     dp.include_router(router)
     me = await bot.get_me()

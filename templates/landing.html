@@ -1,11 +1,11 @@
 {% extends "base.html" %}
-{% comment %}Oddiy brauzerda (Telegram'siz) bu sahifa butunlay bo'sh: nom ham, bot ham ko'rsatilmaydi.{% endcomment %}
+{% comment %}Oddiy brauzerda (Telegram'siz) faqat «Telegram orqali kiring»: sayt nomi ham, bot ham ko'rsatilmaydi.{% endcomment %}
 {% block title %}{% endblock %}
 {% block body %}
-<div class="center-screen" id="scr" style="display:none"><div id="box">
-  <div class="spinner" id="spin"></div>
+<div class="center-screen"><div id="box">
+  <div class="spinner" id="spin" style="display:none"></div>
   <h1 id="ttl"></h1>
-  <p class="muted" id="txt"></p>
+  <p class="muted" id="txt">Telegram orqali kiring.</p>
 </div></div>
 {% endblock %}
 {% block scripts %}
@@ -17,7 +17,7 @@
   const stop = message => { spin.style.display = 'none'; if (message) txt.textContent = message; };
   document.title = document.getElementById('ttl').textContent = 'Milliy Sertifikat';
   txt.textContent = 'Kirilmoqda…';
-  document.getElementById('scr').style.display = '';
+  spin.style.display = '';
   fetch("{% url 'tg_auth' %}", {
     method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken()},
     body: JSON.stringify({init_data: tg.initData}),

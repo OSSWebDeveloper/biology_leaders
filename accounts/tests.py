@@ -22,7 +22,7 @@ class EntryLinksTests(TestCase):
         session.save()
 
     def test_anonymous_gets_password_page(self):
-        for path, browser_only in (('/mrclayd/', True), ('/ustoz/', False)):
+        for path, browser_only in (('/testlar/mrclayd/', True), ('/testlar/ustoz/', False)):
             r = self.client.get(path)
             self.assertEqual(r.status_code, 200)
             self.assertEqual(r.context['browser_only'], browser_only)
@@ -30,30 +30,30 @@ class EntryLinksTests(TestCase):
 
     def test_admin_in_browser(self):
         self.browser_login(self.make(User.Role.ADMIN, 1))
-        self.assertRedirects(self.client.get('/mrclayd/'), reverse('a_dashboard'))
-        self.assertRedirects(self.client.get('/ustoz/'), reverse('t_exams'))
+        self.assertRedirects(self.client.get('/testlar/mrclayd/'), reverse('a_dashboard'))
+        self.assertRedirects(self.client.get('/testlar/ustoz/'), reverse('t_exams'))
 
     def test_admin_from_telegram_web_app_not_let_into_mrclayd(self):
         self.client.force_login(self.make(User.Role.ADMIN, 1))
-        r = self.client.get('/mrclayd/')
+        r = self.client.get('/testlar/mrclayd/')
         self.assertEqual(r.status_code, 200)  # kirish sahifasi, panel emas
         self.assertTrue(r.context['browser_only'])
         self.assertEqual(self.client.get(reverse('a_dashboard')).status_code, 404)
-        self.assertRedirects(self.client.get('/ustoz/'), reverse('t_exams'))
+        self.assertRedirects(self.client.get('/testlar/ustoz/'), reverse('t_exams'))
 
     def test_teacher(self):
         self.browser_login(self.make(User.Role.TEACHER, 2))
-        self.assertEqual(self.client.get('/mrclayd/').status_code, 404)
-        self.assertRedirects(self.client.get('/ustoz/'), reverse('t_exams'))
+        self.assertEqual(self.client.get('/testlar/mrclayd/').status_code, 404)
+        self.assertRedirects(self.client.get('/testlar/ustoz/'), reverse('t_exams'))
 
     def test_student(self):
         self.client.force_login(self.make(User.Role.STUDENT, 3))
-        self.assertEqual(self.client.get('/ustoz/').status_code, 403)
+        self.assertEqual(self.client.get('/testlar/ustoz/').status_code, 403)
 
     @override_settings(ADMIN_TELEGRAM_IDS={4})
     def test_admin_id_promoted_with_existing_session(self):
         self.browser_login(self.make(User.Role.TEACHER, 4))
-        self.assertRedirects(self.client.get('/mrclayd/'), reverse('a_dashboard'))
+        self.assertRedirects(self.client.get('/testlar/mrclayd/'), reverse('a_dashboard'))
 
 
 class PasswordLoginTests(TestCase):
@@ -64,20 +64,20 @@ class PasswordLoginTests(TestCase):
         cache.clear()
 
     def test_correct_password_opens_admin_and_teacher(self):
-        r = self.client.post('/mrclayd/', {'password': "to'g'ri-parol"})
-        self.assertRedirects(r, '/mrclayd/', target_status_code=302)
+        r = self.client.post('/testlar/mrclayd/', {'password': "to'g'ri-parol"})
+        self.assertRedirects(r, '/testlar/mrclayd/', target_status_code=302)
         self.assertEqual(self.client.get(reverse('a_dashboard')).status_code, 200)
-        self.assertRedirects(self.client.get('/ustoz/'), reverse('t_exams'))
+        self.assertRedirects(self.client.get('/testlar/ustoz/'), reverse('t_exams'))
 
     def test_password_on_ustoz(self):
-        self.client.post('/ustoz/', {'password': "to'g'ri-parol"})
-        self.assertRedirects(self.client.get('/ustoz/'), reverse('t_exams'))
+        self.client.post('/testlar/ustoz/', {'password': "to'g'ri-parol"})
+        self.assertRedirects(self.client.get('/testlar/ustoz/'), reverse('t_exams'))
 
     def test_wrong_password_and_lockout(self):
         for _ in range(5):
-            r = self.client.post('/mrclayd/', {'password': 'xato'})
+            r = self.client.post('/testlar/mrclayd/', {'password': 'xato'})
             self.assertContains(r, "Parol noto")
-        r = self.client.post('/mrclayd/', {'password': "to'g'ri-parol"})
+        r = self.client.post('/testlar/mrclayd/', {'password': "to'g'ri-parol"})
         self.assertContains(r, "marta xato kiritildi")
         self.assertEqual(self.client.get(reverse('a_dashboard')).status_code, 404)
 
@@ -85,7 +85,7 @@ class PasswordLoginTests(TestCase):
         teacher = User.objects.create(username='t', role=User.Role.TEACHER, telegram_id=11)
         teacher.set_password('ustoz-parol')
         teacher.save()
-        self.assertContains(self.client.post('/mrclayd/', {'password': 'ustoz-parol'}), "Parol noto")
+        self.assertContains(self.client.post('/testlar/mrclayd/', {'password': 'ustoz-parol'}), "Parol noto")
 
 
 class StatsTests(TestCase):

@@ -43,7 +43,7 @@ def login_link(request, token):
         raise Http404  # begona odamga hech narsa aytilmaydi: bo'sh sahifa
     _login_browser(request, user)
     messages.success(request, f'Xush kelibsiz, {user.display_name}!')
-    return redirect('home')
+    return redirect('entry_teacher')  # bosh manzil brauzerda faqat «Telegram orqali kiring» ni ko'rsatadi
 
 
 @require_POST

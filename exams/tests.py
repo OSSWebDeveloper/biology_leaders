@@ -214,22 +214,41 @@ class AuthTests(TestCase):
         self.assertIsNone(check_login_token(token))
         self.assertIsNone(check_login_token('soxta'))
 
-    def test_plain_browser_sees_nothing(self):
-        # Chrome'da ochilganda sayt nimaligi bilinmasin: nom ham, bot ham, xabar ham yo'q
+    def test_plain_browser_sees_only_telegram_notice(self):
+        # Chrome'da ochilganda faqat «Telegram orqali kiring»: sayt nomi ham, bot ham yo'q
         page = self.client.get(reverse('home'))
         self.assertEqual(page.status_code, 200)
         visible = page.content.decode().split('<script>')[0]
-        for word in ('Milliy', 'Sertifikat', 'Telegram', 'biology', 'Kirilmoqda'):
-            self.assertNotIn(word, visible.replace('telegram.org/js/telegram-web-app.js', ''))
-        self.assertNotIn('botidan oching', page.content.decode())
+        self.assertIn('Telegram orqali kiring.', visible)
+        for word in ('Milliy', 'Sertifikat', 'biology', 'Kirilmoqda'):
+            self.assertNotIn(word, visible)
         self.assertIn('<title></title>', visible)
-        self.assertIn('id="scr" style="display:none"', visible)
-        for url in ('/yoq-sahifa/', reverse('login_link', args=['soxta']), reverse('a_dashboard')):
+        for url in ('/yoq-sahifa/', reverse('login_link', args=['soxta']), reverse('a_dashboard'),
+                    '/mrclayd/', '/ustoz/'):  # eski yashirin manzillar ham yo'q
             response = self.client.get(url)
             self.assertEqual(response.status_code, 404, url)
             self.assertEqual(response.content, b'', url)
         self.client.force_login(make_user(1))
         self.assertContains(self.client.get('/yoq-sahifa/'), 'Topilmadi', status_code=404)
+
+    def test_home_in_browser_session_shows_notice_not_tests(self):
+        self.assertEqual(reverse('entry_admin'), '/testlar/mrclayd/')
+        self.assertEqual(reverse('entry_teacher'), '/testlar/ustoz/')
+        admin = make_user(1, 'admin')
+        self.client.force_login(admin)  # Telegram Web App sessiyasi: avvalgidek testlarga
+        self.assertRedirects(self.client.get(reverse('home')), reverse('exam_list'), fetch_redirect_response=False)
+        session = self.client.session
+        session['browser_login'] = True  # kompyuter brauzeridan parol bilan kirgan
+        session.save()
+        page = self.client.get(reverse('home'))
+        self.assertContains(page, 'Telegram orqali kiring.')
+        self.assertRedirects(self.client.get('/testlar/mrclayd/'), reverse('a_dashboard'))
+        self.assertRedirects(self.client.get('/testlar/ustoz/'), reverse('t_exams'))
+
+    def test_panel_link_opens_teacher_section(self):
+        teacher = make_user(2, 'teacher')
+        response = self.client.get(reverse('login_link', args=[make_login_token(teacher)]))
+        self.assertRedirects(response, reverse('entry_teacher'), target_status_code=302)
 
 
 @override_settings(NOTIFY_DISABLED=True)

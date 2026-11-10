@@ -20,7 +20,9 @@ from .services import can_start, exam_by_code, finalize, save_answer, start_atte
 
 @ensure_csrf_cookie  # landing dagi JS tg_auth ga token yuboradi, sahifada forma yo'q
 def home(request):
-    if not request.user.is_authenticated:
+    # Kompyuter brauzeridan parol bilan kirgan odam ham bosh manzilda faqat «Telegram orqali kiring» ni ko'radi:
+    # maxsus bo'limlarga /testlar/mrclayd/ va /testlar/ustoz/ orqali kiriladi.
+    if not request.user.is_authenticated or request.session.get('browser_login'):
         return render(request, 'landing.html')
     return redirect('exam_list')
 
