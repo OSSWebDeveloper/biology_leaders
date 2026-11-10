@@ -11,6 +11,7 @@ from django.db.models.functions import TruncDate
 from django.utils import timezone
 
 from accounts.models import User
+from tgbot import subscription
 
 from .models import Attempt, Exam
 
@@ -115,7 +116,7 @@ def collect():
             'db_mb': _mb(db_path.stat().st_size) if db_path.exists() else 0,
             'media_mb': _mb(_dir_size(settings.MEDIA_ROOT)),
             'webapp_url': settings.WEBAPP_URL, 'debug': settings.DEBUG,
-            'channel': bool(getattr(settings, 'REQUIRED_CHANNEL_ID', None)),
+            'channel': subscription.channel_health(),
         },
     }
 

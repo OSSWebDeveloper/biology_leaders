@@ -571,6 +571,54 @@ class RoleTests(TestCase):
         self.login_admin_browser()
         self.assertEqual(self.client.get(reverse('a_dashboard')).status_code, 200)
 
+    def test_dashboard_warns_when_bot_is_not_channel_admin(self):
+        self.login_admin_browser()
+        url = reverse('a_dashboard')
+        bad = {'state': 'bad', 'detail': 'Bot kanalda admin emas (holati: left).'}
+        with patch('tgbot.subscription.channel_health', return_value=bad):
+            page = self.client.get(url)
+        self.assertContains(page, 'Majburiy obuna ishlamayapti')
+        self.assertContains(page, 'holati: left')
+        with patch('tgbot.subscription.channel_health', return_value={'state': 'ok', 'detail': ''}):
+            page = self.client.get(url)
+        self.assertNotContains(page, 'Majburiy obuna ishlamayapti')
+        self.assertContains(page, 'ishlayapti')
+
+    def test_channel_health_states(self):
+        import io
+        import urllib.error
+
+        from django.core.cache import cache
+
+        from tgbot import subscription
+
+        def answer(status):
+            return io.BytesIO(json.dumps({'ok': True, 'result': {'status': status}}).encode())
+
+        def http_error(code, description):
+            body = io.BytesIO(json.dumps({'ok': False, 'description': description}).encode())
+            return urllib.error.HTTPError('url', code, 'x', {}, body)
+
+        self.assertEqual(subscription.channel_health()['state'], 'off')  # sozlanmagan
+        cases = (
+            ({'return_value': answer('administrator')}, 'ok', ''),
+            ({'return_value': answer('left')}, 'bad', 'holati: left'),
+            ({'side_effect': http_error(400, 'Bad Request: member list is inaccessible')}, 'bad', 'inaccessible'),
+            ({'side_effect': http_error(401, 'Unauthorized')}, 'bad', 'tokeni'),
+            ({'side_effect': urllib.error.URLError('tarmoq')}, 'unknown', 'URLError'),
+        )
+        with override_settings(REQUIRED_CHANNEL_ID='-1001', BOT_TOKEN=TOKEN):
+            for mock_kwargs, state, detail in cases:
+                cache.delete('kanal-holati')
+                with patch('urllib.request.urlopen', **mock_kwargs) as urlopen:
+                    health = subscription.channel_health()
+                    self.assertEqual(health['state'], state)
+                    self.assertIn(detail, health['detail'])
+                    self.assertIn('user_id=123', urlopen.call_args[0][0])  # botning o'z id si
+                    subscription.channel_health()
+                    self.assertEqual(urlopen.call_count, 1)  # bir daqiqa keshdan
+            cache.delete('kanal-holati')
+
     def test_admin_changes_role_but_not_self(self):
         self.login_admin_browser()
         self.client.post(reverse('a_user_update', args=[self.student.pk]), {'role': 'teacher'})

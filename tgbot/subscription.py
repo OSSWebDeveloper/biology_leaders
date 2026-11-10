@@ -67,5 +67,46 @@ def is_subscribed(telegram_id):
     return ok
 
 
+HEALTH_CACHE_SECONDS = 60
+ADD_ADMIN = "Botni kanalga administrator qilib qo'shing."
+
+
+def channel_health():
+    """Texnik qism uchun: bot kanalda adminmi. Admin bo'lmasa is_subscribed hammani o'tkazib yuboradi.
+
+    state: 'off' (sozlanmagan), 'ok', 'bad' (obuna tekshiruvi ishlamayapti), 'unknown' (Telegram javob bermadi).
+    """
+    if not required():
+        return {'state': 'off', 'detail': ''}
+    key = 'kanal-holati'
+    health = cache.get(key)
+    if health is None:
+        health = _channel_health()
+        cache.set(key, health, HEALTH_CACHE_SECONDS)
+    return health
+
+
+def _channel_health():
+    bot_id = settings.BOT_TOKEN.split(':')[0]
+    query = urllib.parse.urlencode({'chat_id': settings.REQUIRED_CHANNEL_ID, 'user_id': bot_id})
+    try:
+        with urllib.request.urlopen(
+                f'https://api.telegram.org/bot{settings.BOT_TOKEN}/getChatMember?{query}', timeout=5) as response:
+            status = json.load(response)['result'].get('status')
+    except urllib.error.HTTPError as exc:
+        if exc.code == 401:
+            return {'state': 'bad', 'detail': "Bot tokeni yaroqsiz (Telegram 401): .env dagi BOT_TOKEN ni yangilang."}
+        try:
+            description = json.loads(exc.read().decode(errors='replace')).get('description', '')
+        except ValueError:
+            description = ''
+        return {'state': 'bad', 'detail': f"Bot kanalni ko'ra olmayapti ({description or f'HTTP {exc.code}'}). {ADD_ADMIN}"}
+    except (urllib.error.URLError, OSError, ValueError, KeyError) as exc:
+        return {'state': 'unknown', 'detail': f"Telegram javob bermadi ({type(exc).__name__})."}
+    if status in ('administrator', 'creator'):
+        return {'state': 'ok', 'detail': ''}
+    return {'state': 'bad', 'detail': f"Bot kanalda admin emas (holati: {status}). {ADD_ADMIN}"}
+
+
 def forget(telegram_id):
     cache.delete(f'kanal-azo:{telegram_id}')

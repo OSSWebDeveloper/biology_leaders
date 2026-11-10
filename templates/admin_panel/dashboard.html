@@ -12,6 +12,12 @@
   </div>
 </div>
 
+{% if tech.channel.state == 'bad' %}
+<div class="msg error"><b>Majburiy obuna ishlamayapti: hamma obunasiz o'tib ketyapti.</b> {{ tech.channel.detail }}</div>
+{% elif tech.channel.state == 'unknown' %}
+<div class="msg">Majburiy obuna holati tekshirilmadi. {{ tech.channel.detail }}</div>
+{% endif %}
+
 <h2 class="sec">Hozir</h2>
 <div class="stats">
   <div class="stat live"><b>{{ online|length }}</b><span>Onlayn ({{ online_minutes }} daqiqa)</span></div>
@@ -120,7 +126,7 @@
       <tr><td class="muted">Fayllar (media)</td><td class="right">{{ tech.media_mb }} MB</td></tr>
       <tr><td class="muted">Manzil</td><td class="right small">{{ tech.webapp_url|default:"—" }}</td></tr>
       <tr><td class="muted">DEBUG</td><td class="right">{% if tech.debug %}<span class="tag warn">yoqiq</span>{% else %}<span class="tag ok">o'chiq</span>{% endif %}</td></tr>
-      <tr><td class="muted">Majburiy obuna</td><td class="right">{% if tech.channel %}<span class="tag ok">yoqiq</span>{% else %}<span class="tag plain">o'chiq</span>{% endif %}</td></tr>
+      <tr><td class="muted">Majburiy obuna</td><td class="right">{% if tech.channel.state == 'ok' %}<span class="tag ok">ishlayapti</span>{% elif tech.channel.state == 'bad' %}<span class="tag bad">ishlamayapti</span>{% elif tech.channel.state == 'unknown' %}<span class="tag warn">tekshirilmadi</span>{% else %}<span class="tag plain">o'chiq</span>{% endif %}</td></tr>
     </table>
   </div>
 </div>
