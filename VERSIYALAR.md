@@ -1,5 +1,13 @@
 # Versiyalar tarixi
 
+## 1.19.0 — 2026-11-10
+
+Texnik qismda majburiy obuna holati
+
+- /mrclayd sahifasi bot kanalda adminligini Telegram'dan tekshiradi (natija 1 daqiqa keshda)
+- Bot admin bo'lmasa yoki token yaroqsiz bo'lsa sahifa tepasida qizil ogohlantirish: bunday holatda obuna tekshiruvi hammani o'tkazib yuboradi
+- Server jadvalida «Majburiy obuna»: ishlayapti / ishlamayapti / tekshirilmadi / o'chiq
+
 ## 1.18.0 — 2026-11-09
 
 Rasch hisobi tuzatildi (agentlar tekshiruvi bo'yicha)
