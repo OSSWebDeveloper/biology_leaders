@@ -1,5 +1,14 @@
 # Versiyalar tarixi
 
+## 1.21.0 — 2026-11-10
+
+Bosh manzilda «Telegram orqali kiring», maxsus bo'limlar yangi manzilda
+
+- Bosh manzil brauzerda (Chrome) doim «Telegram orqali kiring.» deydi: parol bilan kirgan admin/o'qituvchi ham endi /testlar/ ga tashlanmaydi
+- Maxsus bo'limlarga faqat /testlar/mrclayd/ (texnik qism) va /testlar/ustoz/ (o'qituvchi bo'limi) orqali kiriladi; eski /mrclayd/ va /ustoz/ bo'sh 404
+- O'qituvchi boti menyusi va /panel havolasi yangi manzilga olib boradi
+- Telegram Web App ichida bosh manzil avvalgidek testlarga olib kiradi
+
 ## 1.20.1 — 2026-11-10
 
 Django admin begonalarga yopildi
