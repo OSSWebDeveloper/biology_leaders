@@ -1,5 +1,12 @@
 # Versiyalar tarixi
 
+## 1.24.1 — 2026-11-11
+
+Test belgilangan vaqtda aniq ochiladi
+
+- Jonli sinovda test 29 soniya kech ochilgan edi: endi boshlanish vaqti kelgan qoralama kod kiritilganda darhol e'lon bo'ladi
+- Bot test boshlanishi, tugashi va urinish muddati paytida aniq uyg'onadi: e'lon, yopish va natija kechikmaydi
+
 ## 1.24.0 — 2026-11-11
 
 Natijalar kanalga PDF bo'lib keladi, Rasch diagrammasi bilan
