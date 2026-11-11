@@ -1,5 +1,13 @@
 # Versiyalar tarixi
 
+## 1.22.0 — 2026-11-11
+
+Sinov rejimi: Chrome'da ism-familiya bilan test ishlash
+
+- BROWSER_STUDENTS=1 bo'lsa bosh manzilda ism-familiya formasi chiqadi, Telegram kerak emas
+- Standart holatda o'chiq: haqiqiy ishga tushirishda sayt avvalgidek yopiq
+- Bunday o'quvchida shaxs va kanal obunasi tekshirilmaydi
+
 ## 1.21.0 — 2026-11-10
 
 Bosh manzilda «Telegram orqali kiring», maxsus bo'limlar yangi manzilda
