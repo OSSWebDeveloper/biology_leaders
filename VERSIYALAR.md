@@ -1,5 +1,12 @@
 # Versiyalar tarixi
 
+## 1.25.0 — 2026-11-11
+
+Natijalar PDF namunadagi ko'rinishda
+
+- PDF: baho taqsimoti, har bir savol bo'yicha to'g'ri javoblar soni, Rasch bo'yicha savollar qiyinligi, darajaga qarab rangli jadval (T/J, Z, ball, foiz, daraja)
+- Javob varag'idagi «??» operatori olib tashlandi: eski WebView'li (shu jumladan modlashgan) Telegram mijozlarida sahifa ishlamay qolmaydi
+
 ## 1.24.1 — 2026-11-11
 
 Test belgilangan vaqtda aniq ochiladi
