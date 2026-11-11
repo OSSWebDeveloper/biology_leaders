@@ -1,5 +1,12 @@
 # Versiyalar tarixi
 
+## 1.22.1 — 2026-11-11
+
+Bir vaqtda ko'p o'quvchi ishlaganda javoblar yo'qolmaydi
+
+- Bosim sinovi: 50 o'quvchida javoblarning yarmi «database is locked» xatosi bilan saqlanmas edi
+- Baza yozuvlari endi navbat kutadi (IMMEDIATE) va WAL rejimida ishlaydi
+
 ## 1.22.0 — 2026-11-11
 
 Sinov rejimi: Chrome'da ism-familiya bilan test ishlash
