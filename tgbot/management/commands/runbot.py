@@ -57,6 +57,7 @@ async def run(drop_webhook):
     await bot.set_my_commands([
         BotCommand(command='start', description='Bosh menyu'),
         BotCommand(command='natijalar', description='Oxirgi natijalar'),
+        BotCommand(command='brauzer', description='Ilova ochilmasa: brauzerda ochish'),
         BotCommand(command='yordam', description='Yordam'),
     ])
     if settings.WEBAPP_IS_HTTPS:

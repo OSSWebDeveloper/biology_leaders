@@ -39,10 +39,15 @@ def tg_auth(request):
 
 
 def login_link(request, token):
-    """Bot /panel buyrug'i bergan bir martalik havola (kompyuter brauzeri uchun)."""
+    """Bot bergan bir martalik havola: o'qituvchiga /panel (kompyuter brauzeri), o'quvchiga «brauzerda ochish»
+    (Mini App'ni ochmaydigan Telegram mijozlari uchun zaxira yo'l)."""
     user = check_login_token(token)
     if not user:
         raise Http404  # begona odamga hech narsa aytilmaydi: bo'sh sahifa
+    if not user.is_teacher:
+        # O'quvchi Telegram ichidagidek kiradi: o'z hisobi, kanal obunasi ham tekshiriladi
+        login(request, user, backend='django.contrib.auth.backends.ModelBackend')
+        return redirect('exam_list')
     _login_browser(request, user)
     messages.success(request, f'Xush kelibsiz, {user.display_name}!')
     return redirect('entry_teacher')  # bosh manzil brauzerda faqat «Telegram orqali kiring» ni ko'rsatadi

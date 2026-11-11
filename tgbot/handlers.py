@@ -101,9 +101,36 @@ def open_app_markup():
     """Web App faqat https bilan ochiladi; manzil hali yo'q bo'lsa tugma ko'rsatilmaydi."""
     if not settings.WEBAPP_IS_HTTPS:
         return None
-    return InlineKeyboardMarkup(inline_keyboard=[[
-        InlineKeyboardButton(text='📝 Testlarni ochish', web_app=WebAppInfo(url=settings.WEBAPP_URL + '/')),
-    ]])
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text='📝 Testlarni ochish', web_app=WebAppInfo(url=settings.WEBAPP_URL + '/'))],
+        # Zaxira yo'l: Mini App'ni ochmaydigan (eski yoki modlashgan) Telegram mijozlari uchun.
+        # Oddiy tugma har qanday mijozda ishlaydi va shaxsiy bir martalik havola beradi.
+        [InlineKeyboardButton(text='🌐 Ochilmasa: brauzerda ochish', callback_data=CB_BROWSER)],
+    ])
+
+
+CB_BROWSER = 'open:browser'
+
+
+async def send_browser_link(message: Message, tg_user):
+    """Bir martalik havola: o'quvchi brauzerda o'z hisobi bilan kiradi (kanal obunasi ham tekshiriladi)."""
+    user = await _user_for(tg_user)
+    if not user.is_active:
+        await message.answer('Hisobingiz bloklangan.')
+        return
+    if not user.is_registered:
+        await message.answer("Avval ro'yxatdan o'ting: /start")
+        return
+    if not settings.WEBAPP_URL:
+        await message.answer('Sayt manzili hali sozlanmagan.')
+        return
+    token = await sync_to_async(make_login_token)(user)
+    await message.answer(
+        "Testlarni brauzerda ochish uchun tugmani bosing.\n\n"
+        "Havola bir martalik va 10 daqiqa amal qiladi. Uni boshqalarga bermang: u sizning hisobingizga kiritadi.",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(
+            text='🌐 Brauzerda ochish', url=settings.WEBAPP_URL + reverse('login_link', args=[token]))]]),
+    )
 
 
 async def send_menu(message: Message, user: User):
@@ -249,6 +276,17 @@ async def cmd_results(message: Message):
     await message.answer('\n'.join(lines), parse_mode='HTML')
 
 
+@router.message(Command('brauzer'))
+async def cmd_browser(message: Message):
+    await send_browser_link(message, message.from_user)
+
+
+@router.callback_query(F.data == CB_BROWSER)
+async def cb_browser(callback: CallbackQuery):
+    await callback.answer()
+    await send_browser_link(callback.message, callback.from_user)
+
+
 @router.message(Command('panel'))
 async def cmd_panel(message: Message):
     """Kompyuter brauzerida ishlash uchun bir martalik havola: faqat o'qituvchi va adminga."""
@@ -287,6 +325,6 @@ async def cmd_ustoz(message: Message):
 async def cmd_help(message: Message):
     await message.answer(
         "Bot milliy sertifikat testlarini yechish uchun.\n\n"
-        "/start — bosh menyu\n/natijalar — oxirgi natijalar\n/id — Telegram ID\n/panel — o'qituvchi uchun brauzer havolasi\n\n"
+        "/start — bosh menyu\n/natijalar — oxirgi natijalar\n/brauzer — ilova ochilmasa, testlarni brauzerda ochish\n/id — Telegram ID\n/panel — o'qituvchi uchun brauzer havolasi\n\n"
         "Natijalar Rasch modeli bilan baholanadi va guruhga tashlanadi."
     )

@@ -88,6 +88,24 @@ class BotTests(TransactionTestCase):
         self.assertTrue(group.students.filter(telegram_id=TG_ID).exists())
         self.assertIn('topilmadi', self.send('/start g_XXXXXX')[0])
 
+    def test_browser_link_for_clients_without_mini_app(self):
+        from django.test import Client
+        self.assertIn("ro'yxatdan", self.send('/brauzer')[0])  # hali ism va telefon yo'q
+        self.register()
+        menu = self.session.sent[-1].reply_markup.inline_keyboard
+        self.assertEqual(menu[1][0].callback_data, 'open:browser')  # oddiy tugma: har qanday mijozda ishlaydi
+        urls = []
+        for sent in (lambda: self.press('open:browser'), lambda: (self.send('/brauzer'), self.session.sent)[1]):
+            button = [m for m in sent() if getattr(m, 'reply_markup', None)][-1].reply_markup.inline_keyboard[0][0]
+            self.assertTrue(button.url.startswith('https://sayt.test/kirish/'))
+            urls.append(button.url.replace('https://sayt.test', ''))
+        browser = Client()
+        response = browser.get(urls[-1])
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, '/testlar/')  # o'quvchi o'z hisobi bilan test sahifasiga tushadi
+        self.assertContains(browser.get('/testlar/'), 'Kirish kodi')
+        self.assertEqual(Client().get(urls[-1]).status_code, 404)  # havola bir martalik
+
     def test_panel_only_for_teachers(self):
         self.register()
         self.assertIn('faqat', self.send('/panel')[0])
