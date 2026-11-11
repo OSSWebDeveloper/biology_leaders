@@ -893,6 +893,39 @@ class AutoPublishTests(TestCase):
         self.assertFalse(self.exam.is_published)
         self.sent.assert_not_called()
 
+    def test_code_works_at_start_time_without_waiting_for_bot(self):
+        from .services import exam_by_code, publish_due
+        Exam.objects.filter(pk=self.exam.pk).update(opens_at=timezone.now() + timedelta(seconds=30))
+        self.assertIsNone(exam_by_code(self.exam.access_code))  # hali boshlanmagan
+        Exam.objects.filter(pk=self.exam.pk).update(opens_at=timezone.now() - timedelta(seconds=1))
+        Question.objects.filter(exam=self.exam, number=1).update(correct='')
+        self.assertIsNone(exam_by_code(self.exam.access_code))  # kalit to'liq emas
+        Question.objects.filter(exam=self.exam, number=1).update(correct='B')
+        self.assertEqual(exam_by_code(self.exam.access_code), self.exam)  # bot hali aylanmagan
+        self.exam.refresh_from_db()
+        self.assertTrue(self.exam.is_published)
+        self.sent.assert_not_called()
+        self.assertEqual(publish_due(), 1)  # kanalga xabarni baribir bot yuboradi
+        self.assertEqual(self.sent.call_count, 1)
+        # e'londan olingan test (kanalga chiqib bo'lgan) kod bilan qayta ochilib qolmaydi
+        Exam.objects.filter(pk=self.exam.pk).update(status=Exam.Status.DRAFT)
+        self.assertIsNone(exam_by_code(self.exam.access_code))
+
+    def test_bot_wakes_exactly_at_start_end_and_deadline(self):
+        from .services import seconds_to_next_loop
+        now = timezone.now()
+        Exam.objects.filter(pk=self.exam.pk).update(opens_at=now - timedelta(hours=2), closes_at=now + timedelta(hours=1))
+        self.assertEqual(seconds_to_next_loop(now), 30)
+        Exam.objects.filter(pk=self.exam.pk).update(opens_at=now + timedelta(seconds=12))
+        self.assertAlmostEqual(seconds_to_next_loop(now), 12.3, places=1)
+        Exam.objects.filter(pk=self.exam.pk).update(opens_at=now - timedelta(hours=2), closes_at=now + timedelta(seconds=7))
+        self.assertAlmostEqual(seconds_to_next_loop(now), 7.3, places=1)
+        Exam.objects.filter(pk=self.exam.pk).update(closes_at=now + timedelta(hours=1))
+        Attempt.objects.create(exam=self.exam, student=make_user(61), deadline=now + timedelta(seconds=3))
+        self.assertAlmostEqual(seconds_to_next_loop(now), 3.3, places=1)
+        Attempt.objects.update(deadline=now + timedelta(seconds=0.1))
+        self.assertEqual(seconds_to_next_loop(now), 0.5)  # juda yaqin: baribir biroz kutadi
+
     def test_failed_send_retried(self):
         from .services import publish_due
         self.sent.return_value = False

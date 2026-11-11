@@ -21,7 +21,27 @@ DEFAULT_QUESTION_COUNT = sum(DEFAULT_SHEET.values())
 def exam_by_code(code):
     """Kod bo'yicha e'lon qilingan test; o'quvchi testga faqat shu yo'l bilan kiradi."""
     code = (code or '').strip().upper()
-    return Exam.objects.filter(access_code=code, status=Exam.Status.PUBLISHED).first() if code else None
+    exam = Exam.objects.filter(access_code=code).first() if code else None
+    if exam is None:
+        return None
+    # Boshlanish vaqti kelgan qoralama shu yerning o'zida e'lon qilinadi: bot aylanishini (30 s gacha)
+    # kutib o'quvchi vaqt yo'qotmasin. Kanalga xabarni baribir bot yuboradi.
+    publish_if_due(exam)
+    return exam if exam.is_published else None
+
+
+def publish_if_due(exam, now=None):
+    """Boshlanish vaqti kelgan, kaliti to'liq, hali kanalga chiqmagan qoralamani e'lon qiladi; e'londa bo'lsa True."""
+    if exam.is_published:
+        return True
+    now = now or timezone.now()
+    due = (exam.channel_posted_at is None and exam.opens_at and exam.closes_at
+           and exam.opens_at <= now < exam.closes_at)
+    if not due or not is_ready(exam):
+        return False
+    Exam.objects.filter(pk=exam.pk).update(status=Exam.Status.PUBLISHED)
+    exam.status = Exam.Status.PUBLISHED
+    return True
 
 
 def can_start(exam, user):
@@ -98,11 +118,8 @@ def publish_due(now=None):
     due = Exam.objects.filter(opens_at__lte=now, closes_at__gt=now, channel_posted_at__isnull=True)
     posted = 0
     for exam in due:
-        if not exam.is_published:
-            if not is_ready(exam):
-                continue
-            exam.status = Exam.Status.PUBLISHED
-            exam.save(update_fields=['status'])
+        if not publish_if_due(exam, now):
+            continue
         if not channel:
             continue
         if notify.channel_announcement(exam, channel):
@@ -111,7 +128,28 @@ def publish_due(now=None):
     return posted
 
 
-RESULTS_POST_WINDOW = timedelta(days=1)  # tugaganidan keyin shuncha vaqt ichida yuborilmasa, boshqa urinilmaydi
+LOOP_SECONDS = 30  # bot fon aylanishi oralig'i
+LOOP_MARGIN = 0.3  # voqea vaqtidan biroz keyin uyg'onadi: vaqt taqqoslashi aniq ishlasin
+
+
+def seconds_to_next_loop(now=None):
+    """Bot fon aylanishi qancha uxlasin: odatda LOOP_SECONDS, lekin yaqinda test boshlansa yoki tugasa
+    yoxud urinish muddati tugasa, aynan o'sha paytda uyg'onadi (e'lon, yopish va natija kechikmasin)."""
+    now = now or timezone.now()
+    horizon = now + timedelta(seconds=LOOP_SECONDS)
+    moments = []
+    for field in ('opens_at', 'closes_at'):
+        moments.append(Exam.objects.filter(**{f'{field}__gt': now, f'{field}__lte': horizon})
+                       .order_by(field).values_list(field, flat=True).first())
+    moments.append(Attempt.objects.filter(finished_at__isnull=True, deadline__gt=now, deadline__lte=horizon)
+                   .order_by('deadline').values_list('deadline', flat=True).first())
+    moments = [m for m in moments if m]
+    if not moments:
+        return LOOP_SECONDS
+    return min(LOOP_SECONDS, max(0.5, (min(moments) - now).total_seconds() + LOOP_MARGIN))
+
+
+RESULTS_POST_WINDOW =timedelta(days=1)  # tugaganidan keyin shuncha vaqt ichida yuborilmasa, boshqa urinilmaydi
 
 
 def best_attempts(exam):
