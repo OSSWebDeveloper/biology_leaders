@@ -1,5 +1,13 @@
 # Versiyalar tarixi
 
+## 1.24.0 — 2026-11-11
+
+Natijalar kanalga PDF bo'lib keladi, Rasch diagrammasi bilan
+
+- Kanalga matnli ro'yxat o'rniga PDF hisobot yuboriladi: o'quvchilar jadvali, darajalar, o'rtacha ball
+- Rasch diagrammasi: o'quvchilar qobiliyati va savollar qiyinligi bitta shkalada; savollar bo'yicha to'g'ri javoblar ulushi
+- O'qituvchi natijalar sahifasida shu hisobotni «PDF» tugmasi bilan yuklab oladi
+
 ## 1.23.0 — 2026-11-11
 
 Test tugagach natijalar kanalga avtomatik yuboriladi
