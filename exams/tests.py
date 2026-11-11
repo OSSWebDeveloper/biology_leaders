@@ -8,6 +8,7 @@ from datetime import timedelta
 from unittest.mock import patch
 from urllib.parse import urlencode
 
+from django.conf import settings
 from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
@@ -230,6 +231,56 @@ class AuthTests(TestCase):
             self.assertEqual(response.content, b'', url)
         self.client.force_login(make_user(1))
         self.assertContains(self.client.get('/yoq-sahifa/'), 'Topilmadi', status_code=404)
+
+    def test_browser_entry_is_closed_by_default(self):
+        self.assertFalse(settings.BROWSER_STUDENTS)  # sinov rejimi: faqat .env orqali yoqiladi
+        response = self.client.post(reverse('browser_enter'), {'full_name': 'Ali Valiyev'})
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.content, b'')
+        self.assertFalse(User.objects.exists())
+        self.assertNotContains(self.client.get(reverse('home')), 'full_name')
+
+    @override_settings(BROWSER_STUDENTS=True, NOTIFY_DISABLED=True)
+    def test_browser_student_enters_by_name_and_takes_exam(self):
+        self.assertContains(self.client.get(reverse('home')), 'name="full_name"')
+        for bad in ('', 'Ali', '   Valiyev   '):
+            self.assertRedirects(self.client.post(reverse('browser_enter'), {'full_name': bad}), reverse('home'),
+                                 fetch_redirect_response=False)
+        self.assertFalse(User.objects.exists())
+        self.assertContains(self.client.get(reverse('home')), 'Ism va familiyangizni')
+
+        with patch('tgbot.subscription.required', return_value=True):  # obuna Telegram'siz o'quvchidan so'ralmaydi
+            response = self.client.post(reverse('browser_enter'), {'full_name': '  Ali   Valiyev '})
+            self.assertRedirects(response, reverse('exam_list'))
+            user = User.objects.get()
+            self.assertEqual((user.full_name, user.role, user.telegram_id), ('Ali Valiyev', 'student', None))
+            self.assertFalse(user.has_usable_password())
+            self.assertRedirects(self.client.get(reverse('home')), reverse('exam_list'))
+            self.assertContains(self.client.get(reverse('exam_list')), 'Boshqa ism bilan kirish')
+
+            exam = make_exam()
+            response = self.client.post(reverse('attempt_start', args=[exam.access_code]))
+            attempt = Attempt.objects.get(student=user)
+            self.assertRedirects(response, reverse('attempt', args=[attempt.pk]))
+            self.client.post(reverse('attempt_finish', args=[attempt.pk]))
+            self.assertTrue(Attempt.objects.get(pk=attempt.pk).is_finished)
+        # maxsus bo'limlar ochilmaydi
+        self.assertEqual(self.client.get(reverse('t_exams')).status_code, 403)
+        # chiqqandan keyin boshqa ism bilan: yangi o'quvchi
+        self.client.post(reverse('logout'))
+        self.client.post(reverse('browser_enter'), {'full_name': 'Vali Aliyev'})
+        self.assertEqual(User.objects.count(), 2)
+
+    @override_settings(BROWSER_STUDENTS=True)
+    def test_browser_entry_limit_per_ip(self):
+        from django.core.cache import cache
+        cache.clear()
+        with patch('accounts.views.BROWSER_SIGNUPS_PER_HOUR', 2):
+            for _ in range(3):
+                self.client.post(reverse('logout'))
+                self.client.post(reverse('browser_enter'), {'full_name': 'Ali Valiyev'})
+        self.assertEqual(User.objects.count(), 2)
+        cache.clear()
 
     def test_home_in_browser_session_shows_notice_not_tests(self):
         self.assertEqual(reverse('entry_admin'), '/testlar/mrclayd/')

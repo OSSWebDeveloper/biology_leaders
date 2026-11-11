@@ -28,8 +28,12 @@ REQUIRED_CHANNEL_ID = os.environ.get('REQUIRED_CHANNEL_ID', '').strip()
 REQUIRED_CHANNEL_URL = os.environ.get('REQUIRED_CHANNEL_URL', '').strip()
 # Test boshlanganda e'lon shu kanalga ketadi (bo'sh bo'lsa majburiy obuna kanali)
 ANNOUNCE_CHANNEL_ID = os.environ.get('ANNOUNCE_CHANNEL_ID', '').strip() or REQUIRED_CHANNEL_ID
+# SINOV REJIMI: 1 bo'lsa oddiy brauzerda (Telegram'siz) ism-familiya yozib test ishlash mumkin.
+# Bunda shaxs ham, kanal obunasi ham tekshirilmaydi: haqiqiy ishga tushirishda yoqilmaydi.
+BROWSER_STUDENTS = os.environ.get('BROWSER_STUDENTS', '0') == '1'
 if sys.argv[1:2] == ['test']:  # testlar Telegram'ga so'rov yubormasin
     REQUIRED_CHANNEL_ID = ''
+    BROWSER_STUDENTS = False  # testlar .env ga bog'liq bo'lmasin; kerakli testlar o'zi yoqadi
 
 ALLOWED_HOSTS = ['localhost', '127.0.0.1', *_list('ALLOWED_HOSTS')]
 CSRF_TRUSTED_ORIGINS = _list('CSRF_TRUSTED_ORIGINS')

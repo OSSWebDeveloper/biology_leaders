@@ -1,18 +1,32 @@
 {% extends "base.html" %}
-{% comment %}Oddiy brauzerda (Telegram'siz) faqat «Telegram orqali kiring»: sayt nomi ham, bot ham ko'rsatilmaydi.{% endcomment %}
-{% block title %}{% endblock %}
+{% comment %}Oddiy brauzerda (Telegram'siz) faqat «Telegram orqali kiring»: sayt nomi ham, bot ham ko'rsatilmaydi.
+Sinov rejimida (BROWSER_STUDENTS) o'rniga ism-familiya formasi chiqadi.{% endcomment %}
+{% block title %}{% if browser_form %}Testga kirish{% endif %}{% endblock %}
 {% block body %}
-<div class="center-screen"><div id="box">
+<div class="center-screen"><div id="box"{% if browser_form %} class="login-box"{% endif %}>
   <div class="spinner" id="spin" style="display:none"></div>
   <h1 id="ttl"></h1>
+  {% if browser_form %}
+  <form method="post" action="{% url 'browser_enter' %}" id="enter" class="form" hidden>{% csrf_token %}
+    <input name="full_name" maxlength="150" minlength="5" required autofocus autocomplete="name" placeholder="Ism va familiya">
+    {% for m in messages %}<p class="msg {{ m.tags }} mb0">{{ m }}</p>{% endfor %}
+    <button class="btn block">Kirish</button>
+  </form>
+  <p class="muted" id="txt"></p>
+  {% else %}
   <p class="muted" id="txt">Telegram orqali kiring.</p>
+  {% endif %}
 </div></div>
 {% endblock %}
 {% block scripts %}
 <script>
 (function () {
   const tg = window.Telegram && window.Telegram.WebApp;
-  if (!tg || !tg.initData) return;
+  const form = document.getElementById('enter');
+  if (!tg || !tg.initData) {
+    if (form) { document.getElementById('ttl').textContent = 'Testga kirish'; form.hidden = false; }
+    return;
+  }
   const spin = document.getElementById('spin'), txt = document.getElementById('txt');
   const stop = message => { spin.style.display = 'none'; if (message) txt.textContent = message; };
   document.title = document.getElementById('ttl').textContent = 'Milliy Sertifikat';

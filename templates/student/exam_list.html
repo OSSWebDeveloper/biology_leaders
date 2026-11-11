@@ -14,4 +14,11 @@
   <span class="tag warn mt">Davom ettirish</span>
 </a>
 {% endfor %}
+{% if not user.telegram_id and not request.session.browser_login %}
+{# Sinov rejimi: brauzerdan ism bilan kirgan o'quvchi. Umumiy kompyuterda keyingi odam o'z ismi bilan kirishi uchun #}
+<form method="post" action="{% url 'logout' %}" class="card row">{% csrf_token %}
+  <div class="muted small" style="flex:1">Siz: <b>{{ user.display_name }}</b></div>
+  <button class="btn ghost sm">Boshqa ism bilan kirish</button>
+</form>
+{% endif %}
 {% endblock %}

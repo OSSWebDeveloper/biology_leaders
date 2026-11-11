@@ -1,5 +1,7 @@
 import json
+import secrets
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import login, logout
 from django.core.exceptions import PermissionDenied
@@ -44,6 +46,34 @@ def login_link(request, token):
     _login_browser(request, user)
     messages.success(request, f'Xush kelibsiz, {user.display_name}!')
     return redirect('entry_teacher')  # bosh manzil brauzerda faqat «Telegram orqali kiring» ni ko'rsatadi
+
+
+BROWSER_SIGNUPS_PER_HOUR = 200  # bitta IP dan (kompyuter sinfi bitta IP orqali chiqishi mumkin)
+
+
+@require_POST
+def browser_enter(request):
+    """Sinov rejimi: oddiy brauzerda ism-familiya yozib o'quvchi sifatida kirish (Telegram'siz).
+
+    Har kirishda yangi o'quvchi yoziladi; shaxs va kanal obunasi tekshirilmaydi.
+    """
+    if not settings.BROWSER_STUDENTS:
+        raise Http404
+    name = ' '.join(request.POST.get('full_name', '').split())[:150]
+    if len(name) < 5 or ' ' not in name:
+        messages.error(request, "Ism va familiyangizni to'liq yozing.")
+        return redirect('home')
+    key = f'br-new:{_client_ip(request)}'
+    count = cache.get(key, 0)
+    if count >= BROWSER_SIGNUPS_PER_HOUR:
+        messages.error(request, "Juda ko'p kirish bo'ldi. Birozdan keyin urinib ko'ring.")
+        return redirect('home')
+    cache.set(key, count + 1, 60 * 60)
+    user = User(username=f'br{secrets.token_hex(8)}', full_name=name)
+    user.set_unusable_password()
+    user.save()
+    login(request, user, backend='django.contrib.auth.backends.ModelBackend')
+    return redirect('exam_list')
 
 
 @require_POST

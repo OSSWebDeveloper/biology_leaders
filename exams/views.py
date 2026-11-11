@@ -22,9 +22,11 @@ from .services import can_start, exam_by_code, finalize, save_answer, start_atte
 def home(request):
     # Kompyuter brauzeridan parol bilan kirgan odam ham bosh manzilda faqat «Telegram orqali kiring» ni ko'radi:
     # maxsus bo'limlarga /testlar/mrclayd/ va /testlar/ustoz/ orqali kiriladi.
-    if not request.user.is_authenticated or request.session.get('browser_login'):
-        return render(request, 'landing.html')
-    return redirect('exam_list')
+    if request.user.is_authenticated and not request.session.get('browser_login'):
+        return redirect('exam_list')
+    # Sinov rejimi (BROWSER_STUDENTS): kirmagan odamga brauzerda ism-familiya formasi chiqadi
+    browser_form = settings.BROWSER_STUDENTS and not request.user.is_authenticated
+    return render(request, 'landing.html', {'browser_form': browser_form})
 
 
 def channel_required(view):
