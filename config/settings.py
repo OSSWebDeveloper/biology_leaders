@@ -92,7 +92,13 @@ TEMPLATES = [{
 DATABASES = {'default': {
     'ENGINE': 'django.db.backends.sqlite3',
     'NAME': BASE_DIR / 'db.sqlite3',
-    'OPTIONS': {'timeout': 20},
+    # Bosim sinovi (2026-11-11): 50 o'quvchida javoblarning yarmi «database is locked» bilan yo'qolardi.
+    # IMMEDIATE: yozuvchi so'rov darhol xato olmay navbat kutadi; WAL: o'qish yozishni to'smaydi.
+    'OPTIONS': {
+        'timeout': 20,
+        'transaction_mode': 'IMMEDIATE',
+        'init_command': 'PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL;',
+    },
 }}
 
 AUTH_USER_MODEL = 'accounts.User'
