@@ -8,7 +8,7 @@ from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 
-from exams.services import finish_expired, publish_due, rescore_pending
+from exams.services import finish_expired, post_results_due, publish_due, rescore_pending
 from tgbot.handlers import router
 
 log = logging.getLogger(__name__)
@@ -16,7 +16,8 @@ log = logging.getLogger(__name__)
 
 async def expiry_loop():
     """Har 30 soniyada: boshlanish vaqti kelgan testlarni e'lon qilib kanalga yuboradi, vaqti tugab
-    o'quvchi qaytib kirmagan urinishlarni yakunlab natijasini yuboradi."""
+    o'quvchi qaytib kirmagan urinishlarni yakunlaydi, ballni qayta hisoblaydi va tugagan test natijalarini
+    kanalga yuboradi."""
     while True:
         try:
             await sync_to_async(publish_due)()
@@ -30,6 +31,10 @@ async def expiry_loop():
             await sync_to_async(rescore_pending)()
         except Exception:
             log.exception('rescore_pending xatosi')
+        try:  # eng oxirida: ochiq urinishlar yopilib, ball qayta hisoblangach
+            await sync_to_async(post_results_due)()
+        except Exception:
+            log.exception('post_results_due xatosi')
         await asyncio.sleep(30)
 
 

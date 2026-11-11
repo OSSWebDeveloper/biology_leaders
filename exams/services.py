@@ -111,6 +111,42 @@ def publish_due(now=None):
     return posted
 
 
+RESULTS_POST_WINDOW = timedelta(days=1)  # tugaganidan keyin shuncha vaqt ichida yuborilmasa, boshqa urinilmaydi
+
+
+def best_attempts(exam):
+    """Har o'quvchining eng yaxshi yakunlangan urinishi, ball bo'yicha kamayish tartibida."""
+    best = {}
+    for attempt in (exam.attempts.filter(finished_at__isnull=False).select_related('student')
+                    .order_by('-score', 'finished_at')):
+        best.setdefault(attempt.student_id, attempt)
+    return list(best.values())
+
+
+def post_results_due(now=None):
+    """Tugagan testlarning natijasi kanalga bir marta yuboriladi (bot fon aylanishi chaqiradi).
+
+    Shartlar: tugash vaqti o'tgan, ochiq urinish qolmagan (finish_expired yopgan) va Rasch balli
+    hisoblab bo'lingan (rescore_pending). Hech kim yechmagan test uchun xabar yuborilmaydi.
+    Yuborilmasa keyingi aylanishda yana urinadi.
+    """
+    now = now or timezone.now()
+    channel = settings.ANNOUNCE_CHANNEL_ID
+    if not channel:
+        return 0
+    due = Exam.objects.filter(status=Exam.Status.PUBLISHED, closes_at__lte=now, closes_at__gt=now - RESULTS_POST_WINDOW,
+                              results_posted_at__isnull=True, needs_rescore=False)
+    posted = 0
+    for exam in due:
+        if exam.attempts.filter(finished_at__isnull=True).exists():
+            continue
+        attempts = best_attempts(exam)
+        if attempts and notify.channel_results(exam, channel, attempts):
+            Exam.objects.filter(pk=exam.pk).update(results_posted_at=timezone.now())
+            posted += 1
+    return posted
+
+
 def regrade_exam(exam):
     """Kalit o'zgargach: javoblar qayta tekshiriladi, Rasch balli bot aylanishida yangilanadi."""
     with transaction.atomic():

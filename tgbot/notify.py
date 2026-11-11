@@ -40,6 +40,46 @@ def channel_announcement(exam, chat_id):
     return send_text(chat_id, announcement_caption(exam))
 
 
+MESSAGE_LIMIT = 3800  # Telegram cheklovi 4096 belgi
+
+
+def results_messages(exam, attempts):
+    """Natijalar ro'yxati: bitta xabarga sig'masa bir nechtaga bo'linadi."""
+    own = sum(1 for a in attempts if a.finished_at < a.deadline)
+    head = (f"📊 <b>{esc(exam.title)}</b>: natijalar\n\n"
+            f"👥 Qatnashdi: {len(attempts)}\n"
+            f"✅ O'zi topshirdi: {own}\n"
+            f"⏱ Vaqt tugab yakunlandi: {len(attempts) - own}\n\n"
+            "<b>№. F.I.Sh. — to'g'ri — ball — daraja</b>")
+    messages, current = [], head
+    for index, a in enumerate(attempts, 1):
+        line = (f"{index}. {esc(a.student.display_name)} — {a.correct_items}/{a.total_items} — "
+                f"{a.score:g} — {a.grade or '—'}")
+        if len(current) + len(line) + 1 > MESSAGE_LIMIT:
+            messages.append(current)
+            current = line
+        else:
+            current += '\n' + line
+    messages.append(current)
+    return messages
+
+
+def channel_results(exam, chat_id, attempts):
+    """Natijalarni kanalga yuboradi. Birinchi xabar ketmasa False (keyin qayta uriniladi);
+    keyingilari ketmasa ham True: qayta urinish ro'yxat boshini ikki marta chiqarib qo'ymasin."""
+    if getattr(settings, 'NOTIFY_DISABLED', False) or not settings.BOT_TOKEN:
+        return False
+    for index, text in enumerate(results_messages(exam, attempts)):
+        if index:
+            time.sleep(1)  # kanalga ketma-ket xabar: Telegram cheklovi
+        if not send_text(chat_id, text):
+            if not index:
+                return False
+            log.warning('Natijalar ro\'yxatining %s-qismi kanalga yuborilmadi', index + 1)
+            break
+    return True
+
+
 def _post(chat_id, text, reply_markup=None):
     payload = {'chat_id': chat_id, 'text': text, 'parse_mode': 'HTML'}
     if reply_markup:

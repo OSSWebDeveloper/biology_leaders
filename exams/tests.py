@@ -911,6 +911,67 @@ class AutoPublishTests(TestCase):
         self.assertContains(self.client.get(reverse('t_exam', args=[self.exam.pk])), 'boshlanish vaqtida avtomatik')
 
 
+@override_settings(ANNOUNCE_CHANNEL_ID='-100123')
+class ResultsPostTests(TestCase):
+    def setUp(self):
+        from unittest import mock
+        now = timezone.now()
+        self.exam = make_exam(opens_at=now - timedelta(minutes=10), closes_at=now - timedelta(seconds=5))
+        self.students = [make_user(900 + i) for i in range(3)]
+        for index, student in enumerate(self.students):
+            Attempt.objects.create(exam=self.exam, student=student, deadline=self.exam.closes_at,
+                                   finished_at=self.exam.closes_at - timedelta(minutes=index), score=40 + index,
+                                   correct_items=index, total_items=3)
+        patcher = mock.patch('tgbot.notify.send_text', return_value=True)
+        self.sent = patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def test_posted_once_after_close(self):
+        from .services import post_results_due
+        self.assertEqual(post_results_due(), 1)
+        chat, text = self.sent.call_args.args
+        self.assertEqual(chat, '-100123')
+        self.assertIn('Qatnashdi: 3', text)
+        self.assertLess(text.index('User 902'), text.index('User 900'))  # yuqori ball birinchi
+        self.assertIn('2/3', text)
+        self.assertEqual(post_results_due(), 0)
+        self.assertEqual(self.sent.call_count, 1)
+
+    def test_waits_for_close_open_attempts_and_rescore(self):
+        from .services import post_results_due
+        Exam.objects.filter(pk=self.exam.pk).update(closes_at=timezone.now() + timedelta(minutes=1))
+        self.assertEqual(post_results_due(), 0)  # hali tugamagan
+        Exam.objects.filter(pk=self.exam.pk).update(closes_at=timezone.now() - timedelta(seconds=1), needs_rescore=True)
+        self.assertEqual(post_results_due(), 0)  # ball hali qayta hisoblanmagan
+        Exam.objects.filter(pk=self.exam.pk).update(needs_rescore=False)
+        late = Attempt.objects.create(exam=self.exam, student=make_user(950), deadline=timezone.now())
+        self.assertEqual(post_results_due(), 0)  # ochiq urinish bor
+        late.delete()
+        self.sent.return_value = False
+        self.assertEqual(post_results_due(), 0)  # yuborilmadi: keyin qayta urinadi
+        self.sent.return_value = True
+        self.assertEqual(post_results_due(), 1)
+
+    def test_not_posted_when_empty_old_or_no_channel(self):
+        from .services import post_results_due
+        with override_settings(ANNOUNCE_CHANNEL_ID=''):
+            self.assertEqual(post_results_due(), 0)
+        Exam.objects.filter(pk=self.exam.pk).update(closes_at=timezone.now() - timedelta(days=2))
+        self.assertEqual(post_results_due(), 0)  # eski test
+        Exam.objects.filter(pk=self.exam.pk).update(closes_at=timezone.now() - timedelta(seconds=1))
+        Attempt.objects.all().delete()
+        self.assertEqual(post_results_due(), 0)  # hech kim yechmagan
+        self.sent.assert_not_called()
+
+    def test_long_list_is_split(self):
+        from tgbot import notify
+        attempts = list(Attempt.objects.select_related('student'))
+        with patch('tgbot.notify.MESSAGE_LIMIT', 200):
+            parts = notify.results_messages(self.exam, attempts)
+        self.assertGreater(len(parts), 1)
+        self.assertEqual(sum(part.count('User 90') for part in parts), 3)
+
+
 @override_settings(NOTIFY_DISABLED=True)
 class RescoreTests(TestCase):
     def setUp(self):
