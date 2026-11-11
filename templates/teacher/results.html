@@ -9,7 +9,7 @@
   <div class="stat"><b>{% if average is not None %}{{ average|floatformat:1 }}{% else %}—{% endif %}</b><span>O'rtacha ball</span></div>
 </div>
 <div class="card">
-  <div class="row between"><h2 class="mb0">O'quvchilar</h2>{% if attempts %}<a class="btn ghost sm" href="{% url 't_results_xlsx' exam.pk %}">Excel</a>{% endif %}</div>
+  <div class="row between"><h2 class="mb0">O'quvchilar</h2>{% if attempts %}<span class="row"><a class="btn ghost sm" href="{% url 't_results_pdf' exam.pk %}">PDF</a><a class="btn ghost sm" href="{% url 't_results_xlsx' exam.pk %}">Excel</a></span>{% endif %}</div>
   <div class="table-wrap"><table class="t">
     <tr><th>#</th><th>F.I.Sh.</th><th>To'g'ri</th><th>Ball</th><th>Daraja</th></tr>
     {% for a in attempts %}

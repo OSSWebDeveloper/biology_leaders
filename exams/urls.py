@@ -26,6 +26,7 @@ urlpatterns = [
     path('oqituvchi/test/<int:pk>/ochirish/', t.t_exam_delete, name='t_exam_delete'),
     path('oqituvchi/test/<int:pk>/natijalar/', t.t_results, name='t_results'),
     path('oqituvchi/test/<int:pk>/natijalar.xlsx', t.t_results_xlsx, name='t_results_xlsx'),
+    path('oqituvchi/test/<int:pk>/natijalar.pdf', t.t_results_pdf, name='t_results_pdf'),
     path('oqituvchi/test/<int:pk>/savol/yangi/', t.t_question, name='t_question_new'),
     path('oqituvchi/test/<int:pk>/savol/<int:qid>/', t.t_question, name='t_question'),
     path('oqituvchi/test/<int:pk>/savol/<int:qid>/ochirish/', t.t_question_delete, name='t_question_delete'),

@@ -16,7 +16,7 @@ from django.utils import timezone
 from accounts.models import StudyGroup, User
 from accounts.services import check_login_token, make_login_token, verify_init_data
 
-from .models import Attempt, Exam, Question
+from .models import Answer, Attempt, Exam, Question
 from .pdf_import import parse_mcq_key
 from .scoring import answers_match, grade_for, parse_value
 from .services import finish_expired
@@ -922,20 +922,60 @@ class ResultsPostTests(TestCase):
             Attempt.objects.create(exam=self.exam, student=student, deadline=self.exam.closes_at,
                                    finished_at=self.exam.closes_at - timedelta(minutes=index), score=40 + index,
                                    correct_items=index, total_items=3)
-        patcher = mock.patch('tgbot.notify.send_text', return_value=True)
+        patcher = mock.patch('tgbot.notify._send_document', return_value=True)
         self.sent = patcher.start()
         self.addCleanup(patcher.stop)
+
+    @staticmethod
+    def pdf_text(data):
+        import pymupdf
+        with pymupdf.open(stream=data, filetype='pdf') as doc:
+            # Arial'da bo'sh joy va uzilmas bo'sh joy bitta belgi: o'qiganda \xa0 bo'lib qaytadi
+            return [page.get_text().replace('\xa0', ' ') for page in doc]
 
     def test_posted_once_after_close(self):
         from .services import post_results_due
         self.assertEqual(post_results_due(), 1)
-        chat, text = self.sent.call_args.args
+        chat, data, filename, caption = self.sent.call_args.args
         self.assertEqual(chat, '-100123')
-        self.assertIn('Qatnashdi: 3', text)
-        self.assertLess(text.index('User 902'), text.index('User 900'))  # yuqori ball birinchi
-        self.assertIn('2/3', text)
+        self.assertEqual(filename, 'T_natijalar.pdf')
+        self.assertIn('Qatnashdi: 3', caption)
+        self.assertNotIn('User 90', caption)  # ro'yxat xabarda emas, faylda
+        self.assertTrue(data.startswith(b'%PDF'))
+        pages = self.pdf_text(data)
+        self.assertLess(pages[0].index('User 902'), pages[0].index('User 900'))  # yuqori ball birinchi
+        self.assertIn('2/3', pages[0])
+        self.assertIn('Rasch modeli diagrammasi', pages[-1])
+        self.assertIn("qo'llanmadi", pages[-1])  # 3 o'quvchi: Rasch uchun kam
         self.assertEqual(post_results_due(), 0)
         self.assertEqual(self.sent.call_count, 1)
+
+    def test_report_with_rasch_diagram_and_long_list(self):
+        import random
+        from .report import results_pdf
+        from .services import best_attempts, rasch_rescore
+        rnd = random.Random(3)
+        questions = list(self.exam.questions.all())
+        for index in range(60):
+            attempt = Attempt.objects.create(
+                exam=self.exam, student=make_user(2000 + index), deadline=self.exam.closes_at,
+                finished_at=self.exam.closes_at, total_items=4)
+            for question in questions:
+                Answer.objects.create(attempt=attempt, question=question, choice='B', value_a='1',
+                                      correct_a=rnd.random() < 0.6, correct_b=rnd.random() < 0.3)
+        User.objects.filter(telegram_id=2000).update(full_name='Қодиров Ғанижон Ҳасан ўғли ' + 'uzun ' * 30)
+        rasch_rescore(self.exam)
+        pages = self.pdf_text(results_pdf(self.exam, best_attempts(self.exam)))
+        self.assertGreaterEqual(len(pages), 3)  # 63 qator bir sahifaga sig'maydi
+        text = '\n'.join(pages)
+        self.assertIn('Rasch modeli bilan hisoblandi', text)
+        self.assertIn('Savollar (qiyinlik)', text)
+        self.assertIn("to'g'ri javoblar ulushi", text)
+        self.assertIn('Қодиров Ғанижон', text)
+        self.client.force_login(make_user(77, 'admin'))
+        response = self.client.get(reverse('t_results_pdf', args=[self.exam.pk]))
+        self.assertEqual(response['Content-Type'], 'application/pdf')
+        self.assertTrue(response.content.startswith(b'%PDF'))
 
     def test_waits_for_close_open_attempts_and_rescore(self):
         from .services import post_results_due
@@ -962,14 +1002,6 @@ class ResultsPostTests(TestCase):
         Attempt.objects.all().delete()
         self.assertEqual(post_results_due(), 0)  # hech kim yechmagan
         self.sent.assert_not_called()
-
-    def test_long_list_is_split(self):
-        from tgbot import notify
-        attempts = list(Attempt.objects.select_related('student'))
-        with patch('tgbot.notify.MESSAGE_LIMIT', 200):
-            parts = notify.results_messages(self.exam, attempts)
-        self.assertGreater(len(parts), 1)
-        self.assertEqual(sum(part.count('User 90') for part in parts), 3)
 
 
 @override_settings(NOTIFY_DISABLED=True)

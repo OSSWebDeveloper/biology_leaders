@@ -118,13 +118,13 @@ def best_attempts(exam):
     """Har o'quvchining eng yaxshi yakunlangan urinishi, ball bo'yicha kamayish tartibida."""
     best = {}
     for attempt in (exam.attempts.filter(finished_at__isnull=False).select_related('student')
-                    .order_by('-score', 'finished_at')):
+                    .order_by('-score', '-correct_items', 'finished_at')):
         best.setdefault(attempt.student_id, attempt)
     return list(best.values())
 
 
 def post_results_due(now=None):
-    """Tugagan testlarning natijasi kanalga bir marta yuboriladi (bot fon aylanishi chaqiradi).
+    """Tugagan testlarning natijasi kanalga PDF hisobot bo'lib bir marta yuboriladi (bot fon aylanishi chaqiradi).
 
     Shartlar: tugash vaqti o'tgan, ochiq urinish qolmagan (finish_expired yopgan) va Rasch balli
     hisoblab bo'lingan (rescore_pending). Hech kim yechmagan test uchun xabar yuborilmaydi.
@@ -141,7 +141,10 @@ def post_results_due(now=None):
         if exam.attempts.filter(finished_at__isnull=True).exists():
             continue
         attempts = best_attempts(exam)
-        if attempts and notify.channel_results(exam, channel, attempts):
+        if not attempts:
+            continue
+        from .report import results_pdf  # report shu moduldan foydalanadi: aylanma import bo'lmasin
+        if notify.channel_results(exam, channel, attempts, results_pdf(exam, attempts)):
             Exam.objects.filter(pk=exam.pk).update(results_posted_at=timezone.now())
             posted += 1
     return posted
@@ -173,6 +176,38 @@ def _is_blank(attempt):
     return not any(a.choice or a.value_a.strip() or a.value_b.strip() for a in attempt.answers.all())
 
 
+def item_matrix(exam, attempts):
+    """(band yorliqlari, 0/1 qatorlar): har urinish uchun kaliti bor har bir band to'g'rimi.
+
+    Yorliq: savol raqami, ikki bandli yozma savolda «36a», «36b». attempts javoblari bilan olingan bo'lsin.
+    """
+    items = [(q, part) for q in exam.questions.all() if q.has_key()
+             for part in (('a', 'b') if q.max_items == 2 else ('a',))]
+    labels = [f'{q.number}{part}' if q.max_items == 2 else str(q.number) for q, part in items]
+    rows = []
+    for attempt in attempts:
+        answers = {a.question_id: a for a in attempt.answers.all()}
+        rows.append([int(bool(answers.get(q.pk) and getattr(answers[q.pk], 'correct_' + part)))
+                     for q, part in items])
+    return labels, rows
+
+
+def rasch_fit(exam, answered):
+    """Rasch bahosi: {'thetas': o'quvchilar qobiliyati, 'difficulties': {band yorlig'i: qiyinlik}} yoki None.
+
+    answered: bo'sh bo'lmagan yakunlangan urinishlar. Ular MIN_RASCH_RESPONDENTS dan kam bo'lsa yoki model
+    ishonchli baho bera olmasa None. Hamma to'g'ri yoki hamma xato yechgan band qiyinliklar orasida bo'lmaydi.
+    """
+    if len(answered) < MIN_RASCH_RESPONDENTS:
+        return None
+    labels, rows = item_matrix(exam, answered)
+    thetas, difficulties = rasch.estimate(rows)
+    if difficulties is None:
+        return None
+    informative = [i for i, column in enumerate(zip(*rows)) if 0 < sum(column) < len(rows)]
+    return {'thetas': thetas, 'difficulties': dict(zip((labels[i] for i in informative), difficulties))}
+
+
 def rasch_rescore(exam):
     """Shu testni yakunlaganlarning ballini qayta hisoblaydi.
 
@@ -180,24 +215,16 @@ def rasch_rescore(exam):
     aks holda yoki model ishonchli baho bera olmasa: 75 x to'g'ri javoblar ulushi. Bo'sh varaq
     (birorta ham javob yo'q) Rasch hisobiga kirmaydi, chunki u boshqalarning ballini buzadi; unga 0.
     """
-    items = [(q.pk, part) for q in exam.questions.all() if q.has_key()
-             for part in (('a', 'b') if q.max_items == 2 else ('a',))]
     attempts = list(exam.attempts.filter(finished_at__isnull=False).prefetch_related('answers'))
     if not attempts:
         return
     answered = [a for a in attempts if not _is_blank(a)]
     scores = {}
-    if len(answered) >= MIN_RASCH_RESPONDENTS:
-        responses = []
-        for attempt in answered:
-            answers = {a.question_id: a for a in attempt.answers.all()}
-            responses.append([int(bool(answers.get(pk) and getattr(answers[pk], 'correct_' + part)))
-                              for pk, part in items])
-        thetas, difficulties = rasch.estimate(responses)
-        if difficulties is not None:
-            t = rasch.t_scores(thetas)
-            if len(set(t)) > 1:
-                scores = {attempt.pk: score for attempt, score in zip(answered, t)}
+    fit = rasch_fit(exam, answered)
+    if fit:
+        t = rasch.t_scores(fit['thetas'])
+        if len(set(t)) > 1:
+            scores = {attempt.pk: score for attempt, score in zip(answered, t)}
     for attempt in attempts:
         if _is_blank(attempt):
             attempt.score = 0

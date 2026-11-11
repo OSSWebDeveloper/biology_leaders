@@ -18,7 +18,9 @@ from . import stats
 from .forms import ExamForm, PdfImportForm, QuestionForm
 from .models import Answer, Attempt, Exam, Question
 from .pdf_import import PdfImportError
-from .services import attach_test_file, create_answer_sheet, discard_exam, regrade_exam, set_question_counts
+from .report import results_pdf
+from .services import (attach_test_file, best_attempts, create_answer_sheet, discard_exam, regrade_exam,
+                       set_question_counts)
 
 
 def _exam_or_403(request, pk):
@@ -266,6 +268,15 @@ def t_results_xlsx(request, pk):
     book.save(buf)
     response = HttpResponse(buf.getvalue(), content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
     response['Content-Disposition'] = f'attachment; filename="natijalar_{exam.pk}.xlsx"'
+    return response
+
+
+@teacher_required
+def t_results_pdf(request, pk):
+    """Kanalga ketadigan hisobotning o'zi: jadval, Rasch diagrammasi, savollar bo'yicha o'zlashtirish."""
+    exam = _exam_or_403(request, pk)
+    response = HttpResponse(results_pdf(exam, best_attempts(exam)), content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="natijalar_{exam.pk}.pdf"'
     return response
 
 
