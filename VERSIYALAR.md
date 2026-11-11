@@ -1,5 +1,13 @@
 # Versiyalar tarixi
 
+## 1.26.0 — 2026-11-11
+
+Mini App ochilmaydigan Telegram mijozlari uchun brauzer havolasi
+
+- Bot menyusida «Ochilmasa: brauzerda ochish» tugmasi va /brauzer buyrug'i: o'quvchiga bir martalik, 10 daqiqalik shaxsiy havola beradi
+- Havola orqali o'quvchi brauzerda o'z hisobi bilan kiradi, kanal obunasi ham tekshiriladi
+- Oddiy tugma har qanday (eski yoki modlashgan) Telegram mijozida ishlaydi
+
 ## 1.25.0 — 2026-11-11
 
 Natijalar PDF namunadagi ko'rinishda
