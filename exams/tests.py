@@ -976,10 +976,15 @@ class ResultsPostTests(TestCase):
         self.assertNotIn('User 90', caption)  # ro'yxat xabarda emas, faylda
         self.assertTrue(data.startswith(b'%PDF'))
         pages = self.pdf_text(data)
-        self.assertLess(pages[0].index('User 902'), pages[0].index('User 900'))  # yuqori ball birinchi
-        self.assertIn('2/3', pages[0])
-        self.assertIn('Rasch modeli diagrammasi', pages[-1])
-        self.assertIn("qo'llanmadi", pages[-1])  # 3 o'quvchi: Rasch uchun kam
+        self.assertEqual(len(pages), 4)  # muqova, to'g'ri javoblar soni, savollar qiyinligi, jadval
+        self.assertIn('Baho taqsimoti', pages[0])
+        self.assertIn('Qatnashchilar soni: 3', pages[0])
+        self.assertIn(f'Test kodi: {self.exam.access_code}', pages[0])
+        self.assertIn("to'g'ri javoblar soni", pages[1])
+        self.assertIn('Savollar qiyinchilik darajasi', pages[2])
+        self.assertIn("qo'llanmadi", pages[2])  # 3 o'quvchi: Rasch uchun kam
+        self.assertLess(pages[3].index('User 902'), pages[3].index('User 900'))  # yuqori ball birinchi
+        self.assertIn('NG', pages[3])  # darajasiz
         self.assertEqual(post_results_due(), 0)
         self.assertEqual(self.sent.call_count, 1)
 
@@ -999,12 +1004,11 @@ class ResultsPostTests(TestCase):
         User.objects.filter(telegram_id=2000).update(full_name='Қодиров Ғанижон Ҳасан ўғли ' + 'uzun ' * 30)
         rasch_rescore(self.exam)
         pages = self.pdf_text(results_pdf(self.exam, best_attempts(self.exam)))
-        self.assertGreaterEqual(len(pages), 3)  # 63 qator bir sahifaga sig'maydi
-        text = '\n'.join(pages)
-        self.assertIn('Rasch modeli bilan hisoblandi', text)
-        self.assertIn('Savollar (qiyinlik)', text)
-        self.assertIn("to'g'ri javoblar ulushi", text)
-        self.assertIn('Қодиров Ғанижон', text)
+        self.assertEqual(len(pages), 5)  # 63 qator bitta jadval sahifasiga sig'maydi
+        self.assertIn('Rasch modeli (logit)', pages[2])
+        self.assertNotIn("qo'llanmadi", pages[2])
+        self.assertIn('Қодиров Ғанижон', pages[3] + pages[4])
+        self.assertIn("O'quvchi", pages[4])  # jadval sarlavhasi har sahifada
         self.client.force_login(make_user(77, 'admin'))
         response = self.client.get(reverse('t_results_pdf', args=[self.exam.pk]))
         self.assertEqual(response['Content-Type'], 'application/pdf')

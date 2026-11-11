@@ -167,8 +167,8 @@
     if (keys) keys.addEventListener('click', event => {
       const key = event.target.dataset.k;
       if (!key || !lastInput) return;
-      const start = lastInput.selectionStart ?? lastInput.value.length;
-      const end = lastInput.selectionEnd ?? start;
+      const start = lastInput.selectionStart == null ? lastInput.value.length : lastInput.selectionStart;  // «??» eski WebView'da ishlamaydi
+      const end = lastInput.selectionEnd == null ? start : lastInput.selectionEnd;
       lastInput.setRangeText(key, start, end, 'end');
       lastInput.focus();
       lastInput.dispatchEvent(new Event('input'));
@@ -228,8 +228,8 @@
       keys.addEventListener('click', event => {
         const key = event.target.dataset.k;
         if (!key || !lastInput) return;
-        const start = lastInput.selectionStart ?? lastInput.value.length;
-        const end = lastInput.selectionEnd ?? start;
+        const start = lastInput.selectionStart == null ? lastInput.value.length : lastInput.selectionStart;  // «??» eski WebView'da ishlamaydi
+        const end = lastInput.selectionEnd == null ? start : lastInput.selectionEnd;
         lastInput.setRangeText(key, start, end, 'end');
         lastInput.focus();
         lastInput.dispatchEvent(new Event('input'));
