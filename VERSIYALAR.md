@@ -1,5 +1,13 @@
 # Versiyalar tarixi
 
+## 1.23.0 — 2026-11-11
+
+Test tugagach natijalar kanalga avtomatik yuboriladi
+
+- Tugash vaqti o'tib, ochiq urinishlar yopilgach va ball qayta hisoblangach bot natijalar ro'yxatini kanalga bir marta yuboradi
+- Ro'yxat uzun bo'lsa bir nechta xabarga bo'linadi; hech kim yechmagan test uchun xabar yo'q
+- Yangilanishdan oldin tugagan testlar natijasi yuborilmaydi
+
 ## 1.22.1 — 2026-11-11
 
 Bir vaqtda ko'p o'quvchi ishlaganda javoblar yo'qolmaydi
