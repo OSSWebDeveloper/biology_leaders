@@ -227,6 +227,26 @@ def batareya():
     print('Termux uchun batareya tejash o\'chirildi.')
 
 
+def termux_oldindami():
+    oyna = re.search(r'mCurrentFocus=.*', adb('shell', 'dumpsys', 'window', 'windows'))
+    return bool(oyna and 'com.termux/' in oyna.group(0))
+
+
+def termuxni_old_ga():
+    """Termux'ni ekranga chiqaradi va haqiqatan oldinda ekanini tekshiradi."""
+    for i in range(60):
+        if i % 5 == 0:
+            adb('shell', 'input', 'keyevent', 'KEYCODE_WAKEUP')
+            adb('shell', 'am', 'start', '-n', TERMUX + '/.app.TermuxActivity')
+        time.sleep(2)
+        if termux_oldindami():
+            return
+        if i == 5:
+            print("Termux ekranga chiqmayapti — telefon qulfini oching va Termux ilovasini o'zingiz oching.",
+                  flush=True)
+    xato("Termux ekranga chiqmadi. Telefonda Termux'ni ochib, bat'ni qayta bosing.")
+
+
 def ssh_ulanish():
     sarlavha('4. Termux bilan ulanish (SSH, USB orqali)')
     if not (SSH and SCP and SSH_KEYGEN):
@@ -245,13 +265,16 @@ def ssh_ulanish():
     print("Termux'da SSH yoqilmoqda: telefon ekrani YONIQ va QULFI OCHIQ bo'lsin, "
           "ekranga tegmang — buyruq o'zi teriladi.")
     adb('shell', 'input', 'keyevent', 'KEYCODE_WAKEUP')
-    adb('shell', 'am', 'start', '-n', TERMUX + '/.app.TermuxActivity')
+    termuxni_old_ga()
     # Termux birinchi ochilganda o'z tizimini o'rnatadi (~30 s)
     time.sleep(40 if yangi_termux else 6)
-    buyruq = ('pkg install -y openssh;mkdir -p ~/.ssh;echo %s %s >>~/.ssh/authorized_keys;'
+    # yes| — paket yangilanishida chiqadigan savollarga (masalan sozlama fayli) o'zi javob beradi
+    buyruq = ('yes|pkg install -y openssh;mkdir -p ~/.ssh;echo %s %s >>~/.ssh/authorized_keys;'
               'chmod 600 ~/.ssh/authorized_keys;sshd;echo SSH-TAYYOR' % (ochiq[0], ochiq[1]))
     terish = buyruq.replace(' ', '%s')
     for urinish in range(3):
+        # Matn faqat Termux ekranda turganda teriladi — aks holda brauzer/qidiruvga tushib ketadi
+        termuxni_old_ga()
         natija = adb('shell', "input text '%s'" % terish)
         if 'INJECT_EVENTS' in natija or 'SecurityException' in natija:
             xato("Telefon kompyuterga matn terishga ruxsat bermadi. Xiaomi'da: Developer options → "

@@ -1,5 +1,12 @@
 # Versiyalar tarixi
 
+## 1.29.2 — 2026-11-12
+
+SSH buyrug'i faqat Termux ekranda turganda teriladi
+
+- Termux oldinda ekani tekshiriladi (dumpsys window), aks holda qayta ochiladi — matn brauzer/qidiruvga tushmaydi (TECNO HiOS)
+- yes| — openssh o'rnatishda chiqadigan savollar o'zi javoblanadi
+
 ## 1.29.1 — 2026-11-12
 
 Termux APK GitHub API'siz yuklanadi
