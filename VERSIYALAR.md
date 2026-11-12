@@ -1,5 +1,11 @@
 # Versiyalar tarixi
 
+## 1.30.2 — 2026-11-12
+
+biologiya start SSH'ni ham yoqadi
+
+- Termux yopilib qayta ochilganda sshd o'chib qolardi — endi bio start uni ham yoqadi (kompyuterdagi bat ulana oladi)
+
 ## 1.30.1 — 2026-11-12
 
 Telefondagi ngrok kutish rejimida 20 soniyada bir urinadi

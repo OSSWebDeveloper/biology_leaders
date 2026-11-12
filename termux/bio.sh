@@ -121,6 +121,8 @@ tunnel_och() {
 
 start() {
   command -v termux-wake-lock >/dev/null && termux-wake-lock
+  # Kompyuterdagi bat USB orqali SSH bilan ulanadi — Termux qayta ochilganda ham yoqiq tursin
+  command -v sshd >/dev/null && ! pgrep -x sshd >/dev/null && sshd 2>/dev/null
   if tirikmi django; then
     # Sayt va botlar ishlayapti (masalan USB rejimida), faqat tunnel yo'q — kabel uzilgan
     if [ "$TUNNEL" != kompyuter ] && ! tirikmi tunnel; then
