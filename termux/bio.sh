@@ -31,12 +31,15 @@ tirikmi() { [ -f "$RUN/$1.pid" ] && kill -0 "$(cat "$RUN/$1.pid")" 2>/dev/null; 
 # Jarayonni fonda, yiqilsa qayta tushiradigan aylanma bilan ochadi
 fonda() {
   local nom="$1"; shift
+  # tunnel: kompyuterdagi ngrok domenni ushlab turgan bo'lsa, ngrok serveriga tez-tez urinmasin
+  local kut=5; [ "$nom" = tunnel ] && kut=20
   setsid nohup bash -c '
+    kut="$1"; shift
     while true; do
       "$@"
-      echo "[$(date "+%F %T")] to'"'"'xtadi (kod $?) — 5 soniyadan keyin qayta ishga tushadi"
-      sleep 5
-    done' _ "$@" >> "$LOG/$nom.log" 2>&1 < /dev/null &
+      echo "[$(date "+%F %T")] to'"'"'xtadi (kod $?) — $kut soniyadan keyin qayta ishga tushadi"
+      sleep "$kut"
+    done' _ "$kut" "$@" >> "$LOG/$nom.log" 2>&1 < /dev/null &
   echo $! > "$RUN/$nom.pid"
 }
 

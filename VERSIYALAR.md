@@ -1,5 +1,11 @@
 # Versiyalar tarixi
 
+## 1.30.1 — 2026-11-12
+
+Telefondagi ngrok kutish rejimida 20 soniyada bir urinadi
+
+- Kabel ulangan paytda biologiya start bosilsa: telefondagi ngrok kompyuterdagi bo'shashini 20 soniya oraliq bilan kutadi (avval 5 s), kabel uzilsa o'zi ulanadi
+
 ## 1.30.0 — 2026-11-12
 
 Kabelsiz ishlash: telefonda biologiya start
