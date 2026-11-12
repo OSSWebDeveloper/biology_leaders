@@ -1,5 +1,13 @@
 # Versiyalar tarixi
 
+## 1.28.3 — 2026-11-12
+
+Telefon: Google Play'dagi Termux rasmiy versiyaga almashtiriladi
+
+- Play Market Termux'i (termux.net ombori, boshqa kalit, pymupdf yo'q) aniqlanadi va so'rab, GitHub versiyasiga almashtiriladi
+- 1.28.2 dagi rasmiy omborga o'tish olib tashlandi (Play Termux'da imzo xatosi berardi), ombor asl holiga qaytariladi
+- Kompyuterdagi botni qayta yoqish bat oynasidagi yozuvlarni buzmaydi (cmd AutoRun chcp 1251)
+
 ## 1.28.2 — 2026-11-12
 
 Telefonga o'rnatish: eskirgan Termux oynasi tuzatildi

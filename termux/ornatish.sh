@@ -44,20 +44,19 @@ yashil "1/6  Termux paketlari (birinchi marta 10-20 daqiqa)…"
 # Hech narsa so'ramasin: kompyuterdan SSH orqali ham, qo'lda ham bir xil ishlaydi
 export DEBIAN_FRONTEND=noninteractive
 APT=(apt-get -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold)
+# v1.28.2 yozib qo'ygan ombor manzili (Play Termux'da ishlamaydi) — asl holiga qaytariladi
+SL="$PREFIX/etc/apt/sources.list"
+[ -f "$SL.eski" ] && mv -f "$SL.eski" "$SL"
 "${APT[@]}" update
-# Ba'zi oynalar (mirror, masalan termux.net) eskirgan bo'ladi va python-pymupdf ularda yo'q.
-# Shunday bo'lsa Termux'ning rasmiy ombori ishlatiladi.
 if ! apt-cache show python-pymupdf >/dev/null 2>&1; then
-  sariq "     Tanlangan Termux oynasi eskirgan (python-pymupdf yo'q) — rasmiy omborga o'tilmoqda…"
-  SL="$PREFIX/etc/apt/sources.list"
-  [ -f "$SL" ] && cp "$SL" "$SL.eski"
-  echo "deb https://packages-cf.termux.dev/apt/termux-main stable main" > "$SL"
-  "${APT[@]}" update
-  apt-cache show python-pymupdf >/dev/null 2>&1 || {
-    qizil "python-pymupdf rasmiy omborda ham topilmadi. Termux'da  termux-change-repo  ni ishga tushirib,"
-    qizil "boshqa oynani tanlang va bat'ni qayta bosing."
-    exit 1
-  }
+  qizil "Bu Termux'ning paket omborida python-pymupdf yo'q."
+  if grep -rqs "termux.net" "$PREFIX/etc/apt/sources.list" "$PREFIX/etc/apt/sources.list.d"; then
+    qizil "Bu — Google Play'dagi Termux. Uni telefondan o'chirib, kompyuterdagi bat'ni qayta bosing:"
+    qizil "bat rasmiy (GitHub) Termux'ni o'zi o'rnatadi."
+  else
+    qizil "Termux'da  termux-change-repo  ni ishga tushirib boshqa oynani tanlang va bat'ni qayta bosing."
+  fi
+  exit 1
 fi
 "${APT[@]}" full-upgrade
 "${APT[@]}" install python python-pip python-pymupdf python-pillow ttf-dejavu \

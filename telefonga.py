@@ -129,6 +129,36 @@ def telefonni_top():
     print('Ulandi: %s (Android %s)' % (model, android))
 
 
+def play_termux(versiya):
+    """Google Play'dagi Termux boshqa ombor (termux.net) va boshqa kalit bilan ishlaydi —
+    unda python-pymupdf yo'q, rasmiy omborga ham ulanib bo'lmaydi."""
+    if 'googleplay' in versiya.lower():
+        return True
+    return 'com.android.vending' in adb('shell', 'pm', 'list', 'packages', '-i', TERMUX)
+
+
+def play_termuxni_almashtir(versiya):
+    # Termux qo'shimchalari (API, Widget, Boot…) ham bir xil imzoda bo'lishi shart — ular ham almashadi
+    paketlar = sorted({q.split(':', 1)[1].split()[0] for q in
+                       adb('shell', 'pm', 'list', 'packages', 'com.termux').splitlines() if ':' in q})
+    print("Telefondagi Termux — Google Play versiyasi (%s)." % versiya)
+    print("U boshqa paket omboridan foydalanadi va unda bot uchun kerakli PDF kutubxonasi (pymupdf) yo'q.")
+    print("Uni rasmiy GitHub versiyasiga almashtirish kerak. Bunda Termux ICHIDAGI barcha fayllar o'chadi")
+    print("(telefondagi rasm, kontakt va boshqa ilovalarga tegilmaydi).")
+    print("O'chiriladi: " + ', '.join(paketlar))
+    try:
+        javob = input("\nAlmashtirilsinmi? Ha uchun Enter, bekor qilish uchun N yozib Enter: ").strip().lower()
+    except EOFError:
+        javob = 'n'
+    if javob in ('n', "yo'q", 'yoq', 'no'):
+        xato("bekor qilindi. Play Market'dagi Termux bilan bot ishlamaydi.")
+    for p in paketlar:
+        natija = adb('uninstall', p, timeout=120)
+        print('  %s: %s' % (p, 'o\'chirildi' if 'Success' in natija else natija))
+    if termux_versiyasi():
+        xato("Termux o'chmadi. Telefonda Settings → Apps → Termux → Uninstall qiling va bat'ni qayta bosing.")
+
+
 def termuxni_tekshir():
     sarlavha('2. Termux')
     v = termux_versiyasi()
@@ -136,10 +166,13 @@ def termuxni_tekshir():
         xato("Telefondagi Termux eski (%s) — Play Market versiyasi ishlamaydi. Uni telefondan "
              "o'chiring (Termux ichidagi ma'lumot ham o'chadi) va shu skriptni qayta ishga tushiring — "
              "yangisi o'zi o'rnatiladi." % v)
+    if v and play_termux(v):
+        play_termuxni_almashtir(v)
+        v = None
     if v:
         print('Termux bor: ' + v)
         return
-    abi = adb('shell', 'getprop', 'ro.product.cpu.abi') or 'arm64-v8a'
+    abi =adb('shell', 'getprop', 'ro.product.cpu.abi') or 'arm64-v8a'
     print('Termux yo\'q — rasmiy GitHub\'dan yuklanmoqda (%s)…' % abi)
     so_rov = urllib.request.Request('https://api.github.com/repos/termux/termux-app/releases/latest',
                                     headers={'User-Agent': 'biology-setup'})
@@ -254,7 +287,8 @@ def kompyuterni_yoq():
     if not SERVER_BAT.exists():
         print("BiologyServerRun.bat topilmadi (%s) — botni o'zingiz yoqing." % SERVER_BAT)
         return
-    subprocess.Popen(['cmd', '/c', 'start', '', str(SERVER_BAT)], cwd=str(ILDIZ))
+    # os.startfile — alohida oyna; shu oynaning kodirovkasiga tegmaydi (cmd AutoRun'dagi chcp 1251)
+    os.startfile(str(SERVER_BAT))
     print('Yoqildi: alohida «Biology Server» oynasi ochildi — bot avvalgidek kompyuterda ishlaydi.')
 
 
