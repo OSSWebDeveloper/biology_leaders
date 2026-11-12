@@ -160,6 +160,37 @@ def play_termuxni_almashtir(versiya):
         xato("Termux o'chmadi. Telefonda Settings → Apps → Termux → Uninstall qiling va bat'ni qayta bosing.")
 
 
+def termux_apk(abi):
+    """Rasmiy Termux APK (GitHub). api.github.com ishlatilmaydi — u soatiga 60 so'rov bilan
+    cheklangan; oxirgi versiya sahifa yo'naltirishidan olinadi, fayl to'g'ridan-to'g'ri yuklanadi."""
+    dist = ILDIZ / 'dist'
+    dist.mkdir(exist_ok=True)
+    tayyor = sorted(dist.glob('termux-app_*_%s.apk' % abi)) or sorted(dist.glob('termux-app_*_universal.apk'))
+    if tayyor:
+        return tayyor[-1]
+    teg = 'v0.118.3'
+    try:
+        javob = urllib.request.urlopen(urllib.request.Request(
+            'https://github.com/termux/termux-app/releases/latest', headers={'User-Agent': 'biology-setup'}),
+            timeout=30)
+        m = re.search(r'/releases/tag/(v[\w.\-]+)$', javob.geturl())
+        if m:
+            teg = m.group(1)
+    except Exception:
+        pass
+    for tur in (abi, 'universal'):
+        nom = 'termux-app_%s+github-debug_%s.apk' % (teg, tur)
+        url = 'https://github.com/termux/termux-app/releases/download/%s/%s' % (teg, nom)
+        fayl = dist / nom
+        try:
+            urllib.request.urlretrieve(url, fayl)
+            return fayl
+        except Exception as e:
+            fayl.unlink(missing_ok=True)
+            oxirgi = e
+    xato("Termux yuklab olinmadi (%s). Internetni tekshirib, bat'ni qayta bosing." % oxirgi)
+
+
 def termuxni_tekshir():
     sarlavha('2. Termux')
     v = termux_versiyasi()
@@ -175,16 +206,8 @@ def termuxni_tekshir():
         return
     abi =adb('shell', 'getprop', 'ro.product.cpu.abi') or 'arm64-v8a'
     print('Termux yo\'q — rasmiy GitHub\'dan yuklanmoqda (%s)…' % abi)
-    so_rov = urllib.request.Request('https://api.github.com/repos/termux/termux-app/releases/latest',
-                                    headers={'User-Agent': 'biology-setup'})
-    reliz = json.load(urllib.request.urlopen(so_rov, timeout=30))
-    apk = next((a for a in reliz['assets'] if a['name'].endswith('_%s.apk' % abi)), None) or \
-        next(a for a in reliz['assets'] if a['name'].endswith('universal.apk'))
-    fayl = ILDIZ / 'dist' / apk['name']
-    fayl.parent.mkdir(exist_ok=True)
-    if not fayl.exists():
-        urllib.request.urlretrieve(apk['browser_download_url'], fayl)
-    print('O\'rnatilmoqda: ' + apk['name'])
+    fayl = termux_apk(abi)
+    print('O\'rnatilmoqda: ' + fayl.name)
     natija = adb('install', '-r', str(fayl), timeout=300)
     if 'Success' not in natija:
         if 'USER_RESTRICTED' in natija:

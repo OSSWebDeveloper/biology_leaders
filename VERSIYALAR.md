@@ -1,5 +1,11 @@
 # Versiyalar tarixi
 
+## 1.29.1 — 2026-11-12
+
+Termux APK GitHub API'siz yuklanadi
+
+- api.github.com (soatiga 60 so'rov chegarasi, 403 rate limit) o'rniga reliz fayli to'g'ridan-to'g'ri yuklanadi; dist/ da bo'lsa qayta yuklanmaydi
+
 ## 1.29.0 — 2026-11-12
 
 Telefon — server, ngrok — kompyuterda (USB orqali)
