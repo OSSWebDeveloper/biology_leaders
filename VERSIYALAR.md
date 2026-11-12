@@ -1,5 +1,14 @@
 # Versiyalar tarixi
 
+## 1.32.0 — 2026-11-13
+
+6 ta yorliq, qism-qism boshqarish, telefonsiz kompyuter rejimi
+
+- bio start/stop sayt|oquvchi|oqituvchi — har birini alohida yoqish/to'xtatish
+- Telefonda 6 ta yorliq: Sayt, O'quvchi, O'qituvchi x yoqish/to'xtatish (termux/yorliqlar.sh)
+- Bat telefon topmasa (30 s): sayt, botlar va ngrok kompyuterda ishga tushadi; baza telefonning oxirgi zaxirasidan olinadi
+- Eng yangi baza qayerdaligi kuzatiladi (asosiy_baza.txt): kompyuterda ishlagandan keyin telefonga kompyuterdagi baza yuboriladi
+
 ## 1.31.1 — 2026-11-12
 
 Server 6 ishchi bilan (bosim sinovi natijasi)

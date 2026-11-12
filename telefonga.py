@@ -21,6 +21,7 @@ import json
 import os
 import re
 import shutil
+import sqlite3
 import subprocess
 import sys
 import time
@@ -109,22 +110,25 @@ def telefonni_top():
     if not ADB:
         xato("adb topilmadi (D:\\android\\sdk\\platform-tools\\adb.exe).")
     adb('start-server')
-    for i in range(60):
+    kutish = 15   # ~30 soniya; telefon topilmasa — server kompyuterda ishga tushadi
+    i = 0
+    while True:
         qatorlar = [q.split('\t') for q in adb('devices').splitlines()[1:] if '\t' in q]
         tayyor = [s for s, h in qatorlar if h == 'device']
         if tayyor:
             seriya = tayyor[0]
             break
+        ruxsat_kutyapti = any(h == 'unauthorized' for _, h in qatorlar)
         if i == 0:
-            if any(h == 'unauthorized' for _, h in qatorlar):
+            if ruxsat_kutyapti:
                 print("Telefon ekranida «Allow USB debugging?» oynasi chiqdi — «Always allow from this "
                       "computer» ni belgilab, «Allow» ni bosing.")
             else:
-                print("Telefon topilmadi. USB kabelni ulang va telefonda «Settings → System → "
-                      "Developer options → USB debugging» ni yoqing. Kutyapman…")
+                print("Telefon topilmadi. 30 soniya kutaman, ulanmasa sayt va botlar KOMPYUTERDA ishga tushadi.")
+        i += 1
+        if i >= (60 if ruxsat_kutyapti else kutish):
+            kompyuter_rejimi()
         time.sleep(2)
-    else:
-        xato('telefon 2 daqiqa ichida ulanmadi.')
     model = adb('shell', 'getprop', 'ro.product.model')
     android = adb('shell', 'getprop', 'ro.build.version.release')
     print('Ulandi: %s (Android %s)' % (model, android))
@@ -398,6 +402,42 @@ def kompyuterda_ngrok():
 SERVER_BAT = Path(os.path.expanduser('~')) / 'Desktop' / 'BiologyServerRun.bat'
 
 
+MARKER = ILDIZ / 'asosiy_baza.txt'   # 'telefon' yoki 'kompyuter' — eng yangi ma'lumot qayerda
+
+
+def asosiy_baza():
+    try:
+        return MARKER.read_text(encoding='utf-8').strip()
+    except OSError:
+        return 'telefon'
+
+
+def kompyuter_rejimi():
+    """Telefon ulanmagan: sayt, ikkala bot va ngrok kompyuterda ishga tushadi."""
+    sarlavha("Telefon yo'q — server KOMPYUTERDA ishga tushirilmoqda")
+    db = ILDIZ / 'db.sqlite3'
+    if asosiy_baza() == 'telefon':
+        # Oxirgi ma'lumot telefonda edi — kompyuterdagi eski baza o'rniga telefonning eng so'nggi zaxirasi
+        zaxiralar = sorted(ZAXIRA.glob('telefon_db_*.sqlite3'))
+        if zaxiralar and zaxiralar[-1].stat().st_mtime > db.stat().st_mtime:
+            eski = ZAXIRA / ('kompyuter_db_%s.sqlite3' % datetime.datetime.now().strftime('%Y%m%d_%H%M%S'))
+            shutil.copy2(db, eski)
+            src, dst = sqlite3.connect(zaxiralar[-1]), sqlite3.connect(db)
+            src.backup(dst)
+            dst.close()
+            src.close()
+            vaqt = datetime.datetime.fromtimestamp(zaxiralar[-1].stat().st_mtime).strftime('%d.%m %H:%M')
+            print("Baza: telefonning oxirgi zaxirasi (%s) olindi. Undan keyin telefonda kiritilgan "
+                  "ma'lumotlar telefon qayta ulanganda ham qaytmaydi." % vaqt)
+    MARKER.write_text('kompyuter', encoding='utf-8')
+    kompyuterni_toxtat()
+    kompyuterni_yoq()
+    print()
+    print("TAYYOR: sayt, ikkala bot va ngrok KOMPYUTERDA (%s)." % NGROK_DOMEN)
+    print("Telefonni ulab shu bat'ni bossangiz — server telefonga qaytadi (kompyuterdagi baza bilan).")
+    sys.exit(0)
+
+
 def kompyuterni_yoq():
     """Telefonga o'rnatish muvaffaqiyatsiz bo'lsa — kompyuterdagi bot qayta yoqiladi."""
     sarlavha("Kompyuterdagi server va botlar qayta yoqilmoqda")
@@ -424,6 +464,11 @@ def main():
     batareya()
     ssh_ulanish()
     ornatilgan = telefon_zaxirasi()
+    if asosiy_baza() == 'kompyuter' and not args.baza_bilan:
+        # Oxirgi marta server kompyuterda ishlagan — eng yangi ma'lumot kompyuterda, telefonga o'tadi
+        print("Oxirgi marta server kompyuterda ishlagan — telefonga kompyuterdagi baza yuboriladi "
+              "(telefondagisi avval zaxiralanadi).")
+        args.baza_bilan = True
 
     # Birinchi o'rnatishda (yoki bazani almashtirishda) kompyuter avval to'xtaydi —
     # shunda telefonga ketadigan baza nusxasi oxirgi holatda bo'ladi
@@ -465,6 +510,7 @@ def main():
         xato("telefonda ishga tushmadi. Termux'da `bio log django` yoki `bio log bot` ni ko'ring.")
 
     kompyuterda_ngrok()
+    MARKER.write_text('telefon', encoding='utf-8')
     print('\nTAYYOR: sayt va ikkala bot TELEFONDA ishlayapti, ngrok — kompyuterda (%s).' % NGROK_DOMEN)
     print("Kabelni uzsangiz: telefonda Termux'ni ochib  biologiya start  deb yozing — ngrok telefonga o'tadi.")
     print("Kabelni qayta ulasangiz: shu bat'ni bosing — ngrok yana kompyuterga qaytadi.")

@@ -84,7 +84,7 @@ PY
 }
 
 tunnel_och() {
-  yashil "1/4  Tunnel ($TUNNEL)…"
+  yashil "     Tunnel ($TUNNEL)…"
   : > "$LOG/tunnel.log"
   if [ "$TUNNEL" = kompyuter ]; then
     [ -n "$NGROK_DOMEN" ] || { qizil "sozlama.env da NGROK_DOMEN yo'q."; exit 1; }
@@ -120,44 +120,69 @@ tunnel_och() {
   env_yoz WEBAPP_URL "$url"
 }
 
-start() {
+tayyorlik() {
   command -v termux-wake-lock >/dev/null && termux-wake-lock
   # Kompyuterdagi bat USB orqali SSH bilan ulanadi — Termux qayta ochilganda ham yoqiq tursin
   command -v sshd >/dev/null && ! pgrep -x sshd >/dev/null && sshd 2>/dev/null
+}
+
+sayt_yoq() {
   if tirikmi django; then
-    # Sayt va botlar ishlayapti (masalan USB rejimida), faqat tunnel yo'q — kabel uzilgan
-    if [ "$TUNNEL" != kompyuter ] && ! tirikmi tunnel; then
-      tunnel_och
-    else
-      sariq "Allaqachon ishlayapti."
-    fi
-    holat; return
+    # Sayt ishlayapti, faqat tunnel yo'q bo'lsa (kabel uzilgan) — tunnelni ochadi
+    if [ "$TUNNEL" != kompyuter ] && ! tirikmi tunnel; then tunnel_och; else sariq "Sayt allaqachon ishlayapti."; fi
+    return
   fi
   tunnel_och
-
-  yashil "2/4  Baza…"
+  yashil "     Baza…"
   python manage.py migrate --noinput >> "$LOG/django.log" 2>&1 || { qizil "migrate xato — bio log django"; exit 1; }
-
-  yashil "3/4  Django serveri…"
+  yashil "     Sayt (gunicorn, $ISHCHILAR ishchi)…"
   fonda django gunicorn config.wsgi:application -b "127.0.0.1:$PORT" \
     -w "$ISHCHILAR" -k gthread --threads "$OQIMLAR" --backlog 2048 --timeout 120 \
     --access-logfile - --error-logfile -
+  local i
   for i in $(seq 1 30); do
     curl -s -o /dev/null "http://127.0.0.1:$PORT/" && break; sleep 1
   done
+}
 
-  yashil "4/4  Botlar…"
-  fonda bot python manage.py runbot
-  fonda oqituvchi python manage.py runteacherbot
+oquvchi_yoq() {
+  if tirikmi bot; then sariq "O'quvchi boti allaqachon ishlayapti."; return; fi
+  yashil "     O'quvchi boti…"; fonda bot python manage.py runbot
+}
+
+oqituvchi_yoq() {
+  if tirikmi oqituvchi; then sariq "O'qituvchi boti allaqachon ishlayapti."; return; fi
+  yashil "     O'qituvchi boti…"; fonda oqituvchi python manage.py runteacherbot
+}
+
+# bio start [sayt|oquvchi|oqituvchi] — qism ko'rsatilmasa hammasi
+start() {
+  tayyorlik
+  case "${1:-hammasi}" in
+    sayt)      sayt_yoq ;;
+    oquvchi)   oquvchi_yoq ;;
+    oqituvchi) oqituvchi_yoq ;;
+    *)         sayt_yoq; oquvchi_yoq; oqituvchi_yoq ;;
+  esac
   sleep 3
   holat
 }
 
+# bio stop [sayt|oquvchi|oqituvchi] — qism ko'rsatilmasa hammasi
 stop() {
   local q
-  for q in oqituvchi bot django tunnel; do toxtat_qism "$q"; done
-  command -v termux-wake-unlock >/dev/null && termux-wake-unlock
-  yashil "To'xtatildi."
+  case "${1:-hammasi}" in
+    sayt)      toxtat_qism django; toxtat_qism tunnel; yashil "Sayt to'xtatildi." ;;
+    oquvchi)   toxtat_qism bot; yashil "O'quvchi boti to'xtatildi." ;;
+    oqituvchi) toxtat_qism oqituvchi; yashil "O'qituvchi boti to'xtatildi." ;;
+    *)
+      for q in oqituvchi bot django tunnel; do toxtat_qism "$q"; done
+      yashil "Hammasi to'xtatildi." ;;
+  esac
+  # hech narsa ishlamasa — telefon uxlashiga ruxsat
+  if ! tirikmi django && ! tirikmi bot && ! tirikmi oqituvchi; then
+    command -v termux-wake-unlock >/dev/null && termux-wake-unlock
+  fi
 }
 
 holat() {
@@ -238,9 +263,9 @@ PY
 }
 
 case "${1:-yordam}" in
-  start)     start ;;
-  stop)      stop ;;
-  restart)   stop; sleep 1; start ;;
+  start)     start "$2" ;;
+  stop)      stop "$2" ;;
+  restart)   stop "$2"; sleep 1; start "$2" ;;
   holat)     holat ;;
   kuzat)     kuzat ;;
   log)       tail -n "${3:-40}" "$LOG/${2:-bot}.log" ;;
@@ -253,6 +278,8 @@ Milliy sertifikat — telefondagi buyruqlar:
   bio start              xuddi shu (biologiya = bio)
   biologiya kuzat        jonli holat oynasi (nima ishlayapti, oxirgi so'rovlar)
   bio stop               hammasini to'xtatish
+  bio start sayt | oquvchi | oqituvchi    faqat bittasini yoqish
+  bio stop  sayt | oquvchi | oqituvchi    faqat bittasini to'xtatish
   bio restart            qayta ishga tushirish
   bio holat              nima ishlayapti, joriy manzil
   bio log [qism]         jurnal: bot | oqituvchi | django | tunnel
