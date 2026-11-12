@@ -1,5 +1,12 @@
 # Versiyalar tarixi
 
+## 1.28.0 — 2026-11-12
+
+Bitta bat bilan telefonga o'rnatish
+
+- Biology telefonga.bat → telefonga.py
+- Termux, SSH, paket, o'rnatish va ishga tushirish avtomatik
+
 ## 1.27.0 — 2026-11-12
 
 Telefonda (Termux) ishlatish
