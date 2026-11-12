@@ -1,5 +1,12 @@
 # Versiyalar tarixi
 
+## 1.29.3 — 2026-11-12
+
+Telefonda eng tez paket oynasi tanlanadi
+
+- ornatish.sh bir nechta Termux oynasining tezligini o'lchab, eng tezini oladi (tasodifiy tanlangan oyna 6 KB/s edi)
+- Uzilib qolgan dpkg holati o'rnatishdan oldin tiklanadi
+
 ## 1.29.2 — 2026-11-12
 
 SSH buyrug'i faqat Termux ekranda turganda teriladi

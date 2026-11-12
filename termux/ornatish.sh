@@ -47,6 +47,24 @@ APT=(apt-get -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-co
 # v1.28.2 yozib qo'ygan ombor manzili (Play Termux'da ishlamaydi) — asl holiga qaytariladi
 SL="$PREFIX/etc/apt/sources.list"
 [ -f "$SL.eski" ] && mv -f "$SL.eski" "$SL"
+# Termux oynani (mirror) tasodifiy tanlaydi — ba'zilari juda sekin (bir marta 6 KB/s bo'ldi,
+# o'rnatish soatlab cho'zilardi). Bir nechtasining tezligi o'lchanib, eng tezi olinadi.
+if ! grep -qs "termux.net" "$SL"; then
+  ENG="" ENG_TEZLIK=0
+  for m in https://mirror.mwt.me/termux/main https://packages-cf.termux.dev/apt/termux-main \
+           https://termux.librehat.com/apt/termux-main https://grimler.se/termux/termux-main \
+           https://mirror.accum.se/mirror/termux.dev/termux-main https://packages.termux.dev/apt/termux-main; do
+    t="$(curl -s -o /dev/null -m 8 -w '%{http_code} %{speed_download}' "$m/dists/stable/main/binary-aarch64/Packages" 2>/dev/null)"
+    [ "${t%% *}" = 200 ] || continue
+    t="${t#* }"; t="${t%%.*}"
+    [ "${t:-0}" -gt "$ENG_TEZLIK" ] && { ENG="$m"; ENG_TEZLIK="$t"; }
+  done
+  if [ -n "$ENG" ]; then
+    echo "deb $ENG stable main" > "$SL"
+    echo "     Paket oynasi: $ENG (~$((ENG_TEZLIK / 1024)) KB/s)"
+  fi
+fi
+dpkg --configure -a 2>/dev/null || true
 "${APT[@]}" update
 if ! apt-cache show python-pymupdf >/dev/null 2>&1; then
   qizil "Bu Termux'ning paket omborida python-pymupdf yo'q."
