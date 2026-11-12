@@ -1,5 +1,12 @@
 # Versiyalar tarixi
 
+## 1.31.1 — 2026-11-12
+
+Server 6 ishchi bilan (bosim sinovi natijasi)
+
+- Bosim sinovi: 2 ishchi ~200 o'quvchida chegara, 6 ishchi x 4 oqim 800-1000 o'quvchini ko'taradi — standart 6 qilindi
+- Jonli oynada Traceback qatorlari ko'rsatilmaydi
+
 ## 1.31.0 — 2026-11-12
 
 Jonli holat oynasi
