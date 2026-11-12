@@ -1,5 +1,12 @@
 # Versiyalar tarixi
 
+## 1.28.1 — 2026-11-12
+
+Telefon menyulari inglizcha nomlarda
+
+- USB debugging, Allow, Unrestricted — inglizcha
+- Xiaomi: Install via USB va USB debugging (Security settings) xabarlari
+
 ## 1.28.0 — 2026-11-12
 
 Bitta bat bilan telefonga o'rnatish
