@@ -89,7 +89,7 @@ def yubor():
     chiqish = subprocess.run([adb, 'devices'], capture_output=True, text=True).stdout
     qurilmalar = [q.split('\t')[0] for q in chiqish.splitlines()[1:] if q.endswith('\tdevice')]
     if not qurilmalar:
-        print("Telefon USB'da ulanmagan (yoki «Отладка по USB» o'chiq) — dist/ dagi 2 faylni "
+        print("Telefon USB'da ulanmagan (yoki «USB debugging» o'chiq) — dist/ dagi 2 faylni "
               "Download'ga o'zingiz ko'chiring.")
         return
     for f in (DIST / ZIP_NOM, DIST / 'ornatish.sh'):

@@ -1,7 +1,7 @@
 @echo off
 chcp 65001 >nul
 title Biology telefonga
-rem Telefonni USB bilan ulang (Отладка по USB yoqilgan), ekran qulfini oching va shu faylni bosing.
+rem Telefonni USB bilan ulang (USB debugging yoqilgan), ekran qulfini oching va shu faylni bosing.
 rem Sayt va ikkala bot telefonga o'rnatiladi va ishga tushadi; kompyuterdagisi to'xtatiladi.
 set "LOYIHA=D:\milliy_sertifikat"
 set "PY=%LOYIHA%\.venv\Scripts\python.exe"

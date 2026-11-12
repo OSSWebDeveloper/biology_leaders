@@ -6,9 +6,12 @@ tunnel shuni beradi.
 
 ## Eng oson yo'l: bitta bat
 
-1. Telefonda bir marta: «Настройки → О телефоне» da «Номер сборки» ni 7 marta bosing,
-   so'ng «Для разработчиков → **Отладка по USB**» ni yoqing.
-2. Telefonni USB bilan ulang, ekran qulfini oching.
+1. Telefonda bir marta: **Settings → About phone** da **Build number** ni 7 marta bosing
+   (Xiaomi'da: **MIUI version**), so'ng **Settings → System → Developer options → USB debugging**
+   ni yoqing. Xiaomi'da qo'shimcha **USB debugging (Security settings)** ham yoqilsin — usiz
+   kompyuter Termux'ga buyruq tera olmaydi.
+2. Telefonni USB bilan ulang, ekran qulfini oching. Birinchi ulanganda **«Allow USB debugging?»**
+   chiqadi: **Always allow from this computer** ni belgilab, **Allow** ni bosing.
 3. Ish stolidagi **«Biology telefonga.bat»** ni bosing (yoki loyihadagi xuddi shu fayl).
 
 Bat (`telefonga.py`) o'zi: telefonni topadi → Termux yo'q bo'lsa rasmiy GitHub'dan o'rnatadi →
@@ -34,7 +37,7 @@ eski Termux'da `pkg` ishlamaydi. Ixtiyoriy: **Termux:Widget** (bosh ekranda tugm
 python termux_paket.py
 ```
 
-Telefon USB'da va «Отладка по USB» yoqiq bo'lsa, `biology_termux.zip` va `ornatish.sh`
+Telefon USB'da va «USB debugging» yoqiq bo'lsa, `biology_termux.zip` va `ornatish.sh`
 telefonning **Download** papkasiga o'zi tushadi. Aks holda `dist/` dagi ikki faylni o'zingiz
 ko'chiring. **Zip ichida bot tokenlari bor — boshqalarga yubormang.**
 
@@ -63,7 +66,7 @@ bio start
 Ketma-ketlik: tunnel → `.env` dagi `WEBAPP_URL` yangilanadi → Django (gunicorn) → o'quvchi boti →
 o'qituvchi boti. Biror qism yiqilsa (internet uzilishi va h.k.) 5 soniyada o'zi qayta turadi.
 
-Telefon sozlamalarida Termux uchun **batareya tejashni o'chiring** («Без ограничений»), aks holda
+Telefon sozlamalarida Termux uchun **batareya tejashni o'chiring** (Settings → Apps → Termux → Battery → **Unrestricted**; bat buni o'zi ham qiladi), aks holda
 Android ekran o'chganda jarayonlarni to'xtatishi mumkin. `bio start` ekran o'chsa ham ishlashi
 uchun wake-lock oladi.
 

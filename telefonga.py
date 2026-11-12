@@ -63,7 +63,8 @@ def adb(*argv, tekshir=False, timeout=120):
                        timeout=timeout)
     if tekshir and r.returncode:
         xato('adb %s: %s' % (' '.join(argv), (r.stderr or r.stdout).strip()))
-    return (r.stdout or '').strip()
+    # stderr ham qaytariladi: masalan Xiaomi'da `input` ruxsat xatosi shu yerga chiqadi
+    return ((r.stdout or '') + (r.stderr or '')).strip()
 
 
 def ssh_argv():
@@ -115,10 +116,11 @@ def telefonni_top():
             break
         if i == 0:
             if any(h == 'unauthorized' for _, h in qatorlar):
-                print("Telefon ekranida «Разрешить отладку по USB?» oynasi chiqdi — «Разрешить» ni bosing.")
+                print("Telefon ekranida «Allow USB debugging?» oynasi chiqdi — «Always allow from this "
+                      "computer» ni belgilab, «Allow» ni bosing.")
             else:
-                print("Telefon topilmadi. USB kabelni ulang va telefonda «Для разработчиков → "
-                      "Отладка по USB» ni yoqing. Kutyapman…")
+                print("Telefon topilmadi. USB kabelni ulang va telefonda «Settings → System → "
+                      "Developer options → USB debugging» ni yoqing. Kutyapman…")
         time.sleep(2)
     else:
         xato('telefon 2 daqiqa ichida ulanmadi.')
@@ -151,6 +153,9 @@ def termuxni_tekshir():
     print('O\'rnatilmoqda: ' + apk['name'])
     natija = adb('install', '-r', str(fayl), timeout=300)
     if 'Success' not in natija:
+        if 'USER_RESTRICTED' in natija:
+            xato("Telefon USB orqali ilova o'rnatishga ruxsat bermadi. Xiaomi'da: Developer options → "
+                 "«Install via USB» ni yoqing (yoki ekrandagi so'rovda «Install» ni bosing) va qayta bosing.")
         xato('Termux o\'rnatilmadi: ' + natija)
     print('Termux o\'rnatildi: ' + (termux_versiyasi() or '?'))
     global yangi_termux
@@ -190,7 +195,10 @@ def ssh_ulanish():
               'chmod 600 ~/.ssh/authorized_keys;sshd;echo SSH-TAYYOR' % (ochiq[0], ochiq[1]))
     terish = buyruq.replace(' ', '%s')
     for urinish in range(3):
-        adb('shell', "input text '%s'" % terish)
+        natija = adb('shell', "input text '%s'" % terish)
+        if 'INJECT_EVENTS' in natija or 'SecurityException' in natija:
+            xato("Telefon kompyuterga matn terishga ruxsat bermadi. Xiaomi'da: Developer options → "
+                 "«USB debugging (Security settings)» ni yoqing va qayta bosing.")
         adb('shell', 'input', 'keyevent', 'KEYCODE_ENTER')
         print('Kutilmoqda (openssh o\'rnatilyapti, 1-5 daqiqa)…', flush=True)
         for _ in range(100):

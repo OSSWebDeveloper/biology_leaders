@@ -29,7 +29,7 @@ qizil()  { printf '\033[1;31m%s\033[0m\n' "$*"; }
 case "$ZIP" in
   "$HOME/storage/"*)
     if [ ! -d "$HOME/storage" ]; then
-      sariq "Telefon xotirasiga ruxsat so'ralmoqda — «Разрешить / Allow» ni bosing."
+      sariq "Telefon xotirasiga ruxsat so'ralmoqda — «Allow» ni bosing."
       termux-setup-storage || true
       sleep 3
     fi ;;
