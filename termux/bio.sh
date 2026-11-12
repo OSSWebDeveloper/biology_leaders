@@ -26,7 +26,8 @@ QISMLAR=(tunnel django bot oqituvchi)
 # TUNNEL=kompyuter: ngrok kompyuterda ishlaydi va USB (adb forward) orqali shu serverga ulanadi
 [ "$TUNNEL" = kompyuter ] && QISMLAR=(django bot oqituvchi)
 
-tirikmi() { [ -f "$RUN/$1.pid" ] && kill -0 "$(cat "$RUN/$1.pid")" 2>/dev/null; }
+# /proc orqali: kill -0 boshqa SELinux kontekstidan (masalan adb run-as) ruxsat olmaydi
+tirikmi() { local p; [ -f "$RUN/$1.pid" ] && p="$(cat "$RUN/$1.pid")" && [ -n "$p" ] && [ -d "/proc/$p" ]; }
 
 # Jarayonni fonda, yiqilsa qayta tushiradigan aylanma bilan ochadi
 fonda() {
@@ -171,6 +172,50 @@ holat() {
   echo
 }
 
+# Jonli holat oynasi: «Biology ishga tushirish» yorlig'i shuni ochadi. Ctrl+C yoki oynani
+# yopish — faqat shu ko'rinishni yopadi, sayt va botlar ishlashda davom etadi.
+kuzat() {
+  trap 'printf "\033[?25h"; echo; echo "Ko'"'"'rinish yopildi — sayt va botlar ishlashda davom etyapti."; exit 0' INT TERM
+  local en q nom holat ng
+  while true; do
+    en="$(tput cols 2>/dev/null || echo 44)"
+    ng="$(tunnel_manzili)"
+    {
+      printf '\033[1;32m  BIOLOGY LEADERS — server\033[0m   %s\n\n' "$(date +%H:%M:%S)"
+      for q in django bot oqituvchi tunnel; do
+        case "$q" in
+          django) nom="Sayt" ;; bot) nom="O'quvchi boti" ;; oqituvchi) nom="O'qituvchi boti" ;; tunnel) nom="Internet (ngrok)" ;;
+        esac
+        if [ "$q" = tunnel ]; then
+          if [ -n "$ng" ]; then holat="\033[1;32m●\033[0m telefonda"
+          elif tirikmi tunnel; then holat="\033[1;33m●\033[0m kompyuterda (USB)"
+          else holat="\033[1;33m●\033[0m kompyuterda (USB)"; fi
+        elif tirikmi "$q"; then holat="\033[1;32m●\033[0m ishlayapti"
+        else holat="\033[1;31m●\033[0m TO'XTAGAN"; fi
+        printf "  %-17s $holat\n" "$nom"
+      done
+      echo
+      echo "  $(grep -m1 '^WEBAPP_URL=' .env | cut -d= -f2- | sed 's#https://##')"
+      echo
+      printf '\033[1m  Oxirgi voqealar:\033[0m\n'
+      # sayt so'rovlari va botlardagi xabarlar/xatolar — vaqt bo'yicha aralash
+      {
+        grep -ah '"\(GET\|POST\) ' "$LOG/django.log" 2>/dev/null | tail -n 8 |
+          sed -E 's#^.*\[[0-9]+/[A-Za-z]+/[0-9]+:([0-9:]+) [^]]*\] "(GET|POST) ([^ ?]*)[^"]*" ([0-9]+).*#\1 sayt \2 \3 \4#'
+        grep -ah 'is handled\|ERROR\|Traceback' "$LOG/bot.log" 2>/dev/null | tail -n 5 |
+          sed -E 's#^[0-9-]+ ([0-9:]+),[0-9]+ (.*)#\1 o'"'"'quvchi boti: \2#; s#Update id=[0-9]+ is handled.*#xabar qabul qilindi#'
+        grep -ah 'is handled\|ERROR\|Traceback' "$LOG/oqituvchi.log" 2>/dev/null | tail -n 5 |
+          sed -E 's#^[0-9-]+ ([0-9:]+),[0-9]+ (.*)#\1 o'"'"'qituvchi boti: \2#; s#Update id=[0-9]+ is handled.*#xabar qabul qilindi#'
+      } | sort | tail -n 12 | sed 's/^/  /' | cut -c1-"$en"
+      echo
+      echo "  Yangilanadi har 3 soniyada. Chiqish: Ctrl+C"
+      echo "  (sayt va botlar ishlashda davom etadi)"
+    } > "$RUN/kuzat.txt"
+    printf '\033[H\033[2J\033[?25l'; cat "$RUN/kuzat.txt"
+    sleep 3
+  done
+}
+
 zaxira() {
   local joy="$HOME/storage/downloads"; [ -d "$joy" ] || joy="$ILDIZ/zaxira"
   mkdir -p "$joy"
@@ -197,6 +242,7 @@ case "${1:-yordam}" in
   stop)      stop ;;
   restart)   stop; sleep 1; start ;;
   holat)     holat ;;
+  kuzat)     kuzat ;;
   log)       tail -n "${3:-40}" "$LOG/${2:-bot}.log" ;;
   zaxira)    zaxira ;;
   yangilash) stop; bash "$ILDIZ/termux/ornatish.sh" "${@:2}" && start ;;
@@ -205,6 +251,7 @@ case "${1:-yordam}" in
 Milliy sertifikat — telefondagi buyruqlar:
   biologiya start        sayt + ikkala bot + ngrok (telefonda) — kabel ulanmagan bo'lsa ham ishlaydi
   bio start              xuddi shu (biologiya = bio)
+  biologiya kuzat        jonli holat oynasi (nima ishlayapti, oxirgi so'rovlar)
   bio stop               hammasini to'xtatish
   bio restart            qayta ishga tushirish
   bio holat              nima ishlayapti, joriy manzil

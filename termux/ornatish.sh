@@ -153,8 +153,9 @@ python manage.py collectstatic --noinput -v0
 install -m 755 "$ILDIZ/termux/bio.sh" "$PREFIX/bin/bio"
 ln -sf "$PREFIX/bin/bio" "$PREFIX/bin/biologiya"
 mkdir -p "$HOME/.shortcuts"
-printf '#!/data/data/com.termux/files/usr/bin/bash\nbio start\n' > "$HOME/.shortcuts/Biology ishga tushirish"
-printf '#!/data/data/com.termux/files/usr/bin/bash\nbio stop\n'  > "$HOME/.shortcuts/Biology to'xtatish"
+# Yorliq bosilganda: ishga tushiradi va jonli holat oynasini ochiq qoldiradi
+printf '#!/data/data/com.termux/files/usr/bin/bash\nbio start\nexec bio kuzat\n' > "$HOME/.shortcuts/Biology ishga tushirish"
+printf '#!/data/data/com.termux/files/usr/bin/bash\nbio stop\necho\nread -r -t 8 -p "Oyna 8 soniyada yopiladi (Enter - hozir)..." _\n' > "$HOME/.shortcuts/Biology to'xtatish"
 chmod +x "$HOME/.shortcuts/"*
 
 echo

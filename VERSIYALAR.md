@@ -1,5 +1,13 @@
 # Versiyalar tarixi
 
+## 1.31.0 — 2026-11-12
+
+Jonli holat oynasi
+
+- «Biology ishga tushirish» yorlig'i endi jonli holat oynasini ochadi: sayt, botlar, ngrok holati va oxirgi so'rovlar, har 3 soniyada yangilanadi (biologiya kuzat)
+- «Biology to'xtatish» natijani ko'rsatib, 8 soniyada yopiladi
+- Jarayon tirikligi /proc orqali tekshiriladi
+
 ## 1.30.2 — 2026-11-12
 
 biologiya start SSH'ni ham yoqadi
