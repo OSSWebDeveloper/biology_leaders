@@ -1,5 +1,13 @@
 # Versiyalar tarixi
 
+## 1.27.0 — 2026-11-12
+
+Telefonda (Termux) ishlatish
+
+- ornatish.sh va bio buyrug'i
+- termux_paket.py: kompyuterdan telefonga paket
+- Tunnel: ngrok yoki cloudflare (sozlama.env)
+
 ## 1.26.0 — 2026-11-11
 
 Mini App ochilmaydigan Telegram mijozlari uchun brauzer havolasi
