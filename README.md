@@ -19,6 +19,11 @@ yechganlarning hammasi bo'yicha birga baholanadi (JML), keyin T = 50 + 10·Z bal
 uchun qayta hisoblanadi. O'quvchiga ball ko'rsatilmaydi, natijani o'qituvchi guruhga tashlaydi.
 Savol vaznlari Rasch ballga ta'sir qilmaydi.
 
+## Telefonda (Termux) ishlatish — hostsiz
+
+Sayt va ikkala bot Android telefonda: [TERMUX.md](TERMUX.md).
+Kompyuterda `python termux_paket.py`, telefonda `bash ~/storage/downloads/ornatish.sh` va `bio start`.
+
 ## Ishga tushirish
 
 ```bash
