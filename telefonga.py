@@ -219,6 +219,23 @@ def termuxni_tekshir():
     yangi_termux = True
 
 
+def widget_ornat():
+    """Termux:Widget — bosh ekranda «Biology ishga tushirish» yorlig'i uchun. Majburiy emas."""
+    if 'package:com.termux.widget' in adb('shell', 'pm', 'list', 'packages', 'com.termux.widget'):
+        return
+    nom = 'termux-widget-app_v0.15.0+github.debug.apk'
+    fayl = ILDIZ / 'dist' / nom
+    try:
+        if not fayl.exists():
+            urllib.request.urlretrieve('https://github.com/termux/termux-widget/releases/download/v0.15.0/' + nom, fayl)
+    except Exception as e:
+        print('Termux:Widget yuklanmadi (%s) — yorliqsiz davom etiladi.' % e)
+        return
+    print("Termux:Widget o'rnatilmoqda (telefonda «Install» chiqsa, bosing)…", flush=True)
+    natija = adb('install', '-r', str(fayl), timeout=300)
+    print("Termux:Widget o'rnatildi." if 'Success' in natija else 'Termux:Widget o\'rnatilmadi: ' + natija)
+
+
 def batareya():
     sarlavha('3. Batareya cheklovi')
     adb('shell', 'dumpsys', 'deviceidle', 'whitelist', '+' + TERMUX)
@@ -402,6 +419,7 @@ def main():
 
     telefonni_top()
     termuxni_tekshir()
+    widget_ornat()
     batareya()
     ssh_ulanish()
     ornatilgan = telefon_zaxirasi()

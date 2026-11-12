@@ -54,10 +54,11 @@ if ! grep -qs "termux.net" "$SL"; then
   for m in https://mirror.mwt.me/termux/main https://packages-cf.termux.dev/apt/termux-main \
            https://termux.librehat.com/apt/termux-main https://grimler.se/termux/termux-main \
            https://mirror.accum.se/mirror/termux.dev/termux-main https://packages.termux.dev/apt/termux-main; do
-    t="$(curl -s -o /dev/null -m 8 -w '%{http_code} %{speed_download}' "$m/dists/stable/main/binary-aarch64/Packages" 2>/dev/null)"
+    # set -e: curl vaqti tugasa yoki taqqoslash «yo'q» bo'lsa skript to'xtab qolmasin
+    t="$(curl -s -o /dev/null -m 8 -w '%{http_code} %{speed_download}' "$m/dists/stable/main/binary-aarch64/Packages" 2>/dev/null || true)"
     [ "${t%% *}" = 200 ] || continue
     t="${t#* }"; t="${t%%.*}"
-    [ "${t:-0}" -gt "$ENG_TEZLIK" ] && { ENG="$m"; ENG_TEZLIK="$t"; }
+    if [ "${t:-0}" -gt "$ENG_TEZLIK" ] 2>/dev/null; then ENG="$m"; ENG_TEZLIK="$t"; fi
   done
   if [ -n "$ENG" ]; then
     echo "deb $ENG stable main" > "$SL"

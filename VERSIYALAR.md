@@ -1,5 +1,12 @@
 # Versiyalar tarixi
 
+## 1.29.4 — 2026-11-12
+
+Telefon bosh ekranida yorliq (Termux:Widget)
+
+- Bat Termux:Widget'ni o'zi o'rnatadi — bosh ekranda «Biology ishga tushirish» / «Biology to'xtatish»
+- ornatish.sh: oyna tezligini o'lchash set -e da to'xtab qolmaydi
+
 ## 1.29.3 — 2026-11-12
 
 Telefonda eng tez paket oynasi tanlanadi
