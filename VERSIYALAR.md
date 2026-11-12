@@ -1,5 +1,13 @@
 # Versiyalar tarixi
 
+## 1.30.0 — 2026-11-12
+
+Kabelsiz ishlash: telefonda biologiya start
+
+- biologiya start — sayt, botlar va ngrok telefonning o'zida (kabel shart emas); bio bilan bir xil
+- Kabel ulanganda ngrok kompyuterda; «Biology Ngrok» oynasi (ngrok_kuzatuv.py) kabel uzilsa ngrok'ni o'zi yopadi, domen telefonga o'tadi
+- Sayt ishlab turganda biologiya start faqat yetishmayotgan tunnelni ochadi; ngrok har doim telefonga o'rnatiladi
+
 ## 1.29.4 — 2026-11-12
 
 Telefon bosh ekranida yorliq (Termux:Widget)

@@ -375,8 +375,9 @@ def kompyuterda_ngrok():
         xato(r'ngrok.exe topilmadi (D:\asosiy\ngrok.exe).')
     if not tunnel_bormi():
         # /d — cmd AutoRun (chcp 1251) ishlamasin; alohida oyna: bat yopilsa ham ngrok ishlab turadi
-        subprocess.Popen('cmd /d /s /k "title Biology Ngrok& "%s" http %s --url %s"'
-                         % (NGROK_EXE, port, NGROK_DOMEN), creationflags=subprocess.CREATE_NEW_CONSOLE)
+        # ngrok_kuzatuv.py: kabel uzilsa ngrok'ni o'zi yopadi (domen telefonga o'tishi uchun)
+        subprocess.Popen('cmd /d /s /k "title Biology Ngrok& chcp 65001 >nul& "%s" ngrok_kuzatuv.py"'
+                         % sys.executable, cwd=str(ILDIZ), creationflags=subprocess.CREATE_NEW_CONSOLE)
         for _ in range(30):
             time.sleep(1)
             if tunnel_bormi():
@@ -453,19 +454,20 @@ def main():
         kompyuterni_toxtat()
 
     sarlavha('8. Telefonda server va botlar ishga tushirilmoqda')
-    # ngrok kompyuterda bo'ladi: telefon tunnel ochmaydi, manzil — doimiy ngrok domeni
-    ssh("cd ~/milliy_sertifikat && sed -i 's/^TUNNEL=.*/TUNNEL=kompyuter/' sozlama.env && "
+    # Kabel ulangan: ngrok kompyuterda (TUNNEL_MAJBURIY=kompyuter). sozlama.env da esa TUNNEL=ngrok —
+    # kabelsiz `biologiya start` yozilganda ngrok telefonning o'zida ochiladi
+    ssh("cd ~/milliy_sertifikat && sed -i 's/^TUNNEL=.*/TUNNEL=ngrok/' sozlama.env && "
         "(grep -q '^NGROK_DOMEN=' sozlama.env && sed -i 's#^NGROK_DOMEN=.*#NGROK_DOMEN=%s#' sozlama.env "
         "|| echo NGROK_DOMEN=%s >> sozlama.env)" % (NGROK_DOMEN, NGROK_DOMEN))
-    kod, _ = ssh('bio stop >/dev/null; bio start', korsat=True)
+    kod, _ = ssh('bio stop >/dev/null; TUNNEL_MAJBURIY=kompyuter bio start', korsat=True)
     if kod:
         kompyuterni_yoq()
         xato("telefonda ishga tushmadi. Termux'da `bio log django` yoki `bio log bot` ni ko'ring.")
 
     kompyuterda_ngrok()
     print('\nTAYYOR: sayt va ikkala bot TELEFONDA ishlayapti, ngrok — kompyuterda (%s).' % NGROK_DOMEN)
-    print('USB kabelni AJRATMANG va «Biology Ngrok» oynasini yopmang — sayt shular orqali ochiladi.')
-    print("Kabel uzilsa yoki kompyuter qayta yoqilsa: shu bat'ni qayta bosing.")
+    print("Kabelni uzsangiz: telefonda Termux'ni ochib  biologiya start  deb yozing — ngrok telefonga o'tadi.")
+    print("Kabelni qayta ulasangiz: shu bat'ni bosing — ngrok yana kompyuterga qaytadi.")
     return 0
 
 

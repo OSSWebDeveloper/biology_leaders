@@ -17,6 +17,9 @@ mkdir -p "$RUN" "$LOG"
 TUNNEL=ngrok; NGROK_DOMEN=""; PORT=8123; ISHCHILAR=2; OQIMLAR=8
 # shellcheck disable=SC1091
 [ -f "$ILDIZ/sozlama.env" ] && . "$ILDIZ/sozlama.env"
+# Kompyuterdagi bat USB rejimida TUNNEL_MAJBURIY=kompyuter bilan chaqiradi; qo'lda
+# `biologiya start` (kabelsiz) esa sozlama.env dagi TUNNEL=ngrok — ngrok telefonning o'zida
+[ -n "${TUNNEL_MAJBURIY:-}" ] && TUNNEL="$TUNNEL_MAJBURIY"
 export PYTHONUNBUFFERED=1 PYTHONIOENCODING=utf-8
 
 QISMLAR=(tunnel django bot oqituvchi)
@@ -76,10 +79,7 @@ open(f, 'w', encoding='utf-8').write(t)
 PY
 }
 
-start() {
-  if tirikmi django; then sariq "Allaqachon ishlayapti."; holat; return; fi
-  command -v termux-wake-lock >/dev/null && termux-wake-lock
-
+tunnel_och() {
   yashil "1/4  Tunnel ($TUNNEL)…"
   : > "$LOG/tunnel.log"
   if [ "$TUNNEL" = kompyuter ]; then
@@ -101,13 +101,33 @@ start() {
     [ -n "$url" ] && break
     url="$(tunnel_manzili)"; [ -n "$url" ] && break; sleep 1
   done
+  if [ -z "$url" ] && [ "$TUNNEL" = ngrok ] && [ -n "$NGROK_DOMEN" ]; then
+    # Domen doimiy: kompyuterdagi ngrok hali ochiq bo'lsa, u yopilishi bilan telefondagisi
+    # o'zi ulanadi (har 5 soniyada qayta urinadi) — sayt va botlar kutib turmaydi
+    sariq "     ngrok hali ulanmadi (kompyuterdagi ngrok ochiq bo'lishi mumkin) — o'zi qayta urinadi."
+    tail -n 3 "$LOG/tunnel.log" | cut -c1-160
+    url="$NGROK_DOMEN"
+  fi
   if [ -z "$url" ]; then
     qizil "Tunnel ochilmadi. Jurnal:"; tail -n 15 "$LOG/tunnel.log"
-    sariq "ngrok: shu domen kompyuterda ochiq bo'lsa, avval o'sha yerda yoping."
     toxtat_qism tunnel; exit 1
   fi
   echo "     $url"
   env_yoz WEBAPP_URL "$url"
+}
+
+start() {
+  command -v termux-wake-lock >/dev/null && termux-wake-lock
+  if tirikmi django; then
+    # Sayt va botlar ishlayapti (masalan USB rejimida), faqat tunnel yo'q — kabel uzilgan
+    if [ "$TUNNEL" != kompyuter ] && ! tirikmi tunnel; then
+      tunnel_och
+    else
+      sariq "Allaqachon ishlayapti."
+    fi
+    holat; return
+  fi
+  tunnel_och
 
   yashil "2/4  Baza…"
   python manage.py migrate --noinput >> "$LOG/django.log" 2>&1 || { qizil "migrate xato — bio log django"; exit 1; }
@@ -178,7 +198,8 @@ case "${1:-yordam}" in
   *)
     cat <<'MATN'
 Milliy sertifikat — telefondagi buyruqlar:
-  bio start              tunnel + sayt + ikkala botni ishga tushirish
+  biologiya start        sayt + ikkala bot + ngrok (telefonda) — kabel ulanmagan bo'lsa ham ishlaydi
+  bio start              xuddi shu (biologiya = bio)
   bio stop               hammasini to'xtatish
   bio restart            qayta ishga tushirish
   bio holat              nima ishlayapti, joriy manzil

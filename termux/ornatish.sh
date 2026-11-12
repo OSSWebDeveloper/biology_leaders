@@ -135,9 +135,8 @@ for nom in DejaVuSans.ttf DejaVuSans-Bold.ttf; do
 done
 
 yashil "5/6  ngrok…"
-if grep -qs '^TUNNEL=kompyuter' "$ILDIZ/sozlama.env"; then
-  echo "     kerak emas — ngrok kompyuterda ishlaydi."
-elif [ ! -x "$ILDIZ/bin/ngrok" ]; then
+# Kabel ulanganda ngrok kompyuterda, kabelsiz (`biologiya start`) — telefonda; shuning uchun har doim
+if [ ! -x "$ILDIZ/bin/ngrok" ]; then
   case "$(uname -m)" in
     aarch64) arx=arm64 ;; armv7l|armv8l) arx=arm ;; x86_64) arx=amd64 ;; *) arx=arm64 ;;
   esac
@@ -152,6 +151,7 @@ cd "$ILDIZ"
 python manage.py migrate --noinput
 python manage.py collectstatic --noinput -v0
 install -m 755 "$ILDIZ/termux/bio.sh" "$PREFIX/bin/bio"
+ln -sf "$PREFIX/bin/bio" "$PREFIX/bin/biologiya"
 mkdir -p "$HOME/.shortcuts"
 printf '#!/data/data/com.termux/files/usr/bin/bash\nbio start\n' > "$HOME/.shortcuts/Biology ishga tushirish"
 printf '#!/data/data/com.termux/files/usr/bin/bash\nbio stop\n'  > "$HOME/.shortcuts/Biology to'xtatish"
@@ -159,6 +159,6 @@ chmod +x "$HOME/.shortcuts/"*
 
 echo
 yashil "Tayyor! Versiya: $(cat "$ILDIZ/versiya.txt")"
-echo "Ishga tushirish:  bio start      Buyruqlar:  bio yordam"
+echo "Ishga tushirish:  biologiya start      Buyruqlar:  biologiya yordam"
 sariq "Eslatma: kompyuterdagi server va botlarni avval to'xtating — bitta bot tokeni va ngrok"
 sariq "domeni bir vaqtda faqat BITTA joyda ishlay oladi."
