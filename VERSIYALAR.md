@@ -1,5 +1,13 @@
 # Versiyalar tarixi
 
+## 1.29.0 — 2026-11-12
+
+Telefon — server, ngrok — kompyuterda (USB orqali)
+
+- Bat: sayt va ikkala bot telefonda, ngrok kompyuterda; kompyuter 8123 USB (adb forward) orqali telefonga ulanadi
+- bio.sh: TUNNEL=kompyuter rejimi (telefon tunnel ochmaydi, manzil — doimiy ngrok domeni); namuna sozlamada standart
+- Kompyuterni to'xtatishda adb (USB yo'naltirish) o'ldirilmaydi
+
 ## 1.28.3 — 2026-11-12
 
 Telefon: Google Play'dagi Termux rasmiy versiyaga almashtiriladi

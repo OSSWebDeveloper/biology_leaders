@@ -1,6 +1,6 @@
 #!/data/data/com.termux/files/usr/bin/bash
 # Milliy sertifikat — telefonda boshqarish:  bio start | stop | restart | holat | log | zaxira | yangilash
-# Ishga tushadi: tunnel (ngrok yoki cloudflare) → .env dagi WEBAPP_URL → Django (gunicorn)
+# Ishga tushadi: tunnel (kompyuter, ngrok yoki cloudflare) → .env dagi WEBAPP_URL → Django (gunicorn)
 #                → o'quvchi boti → o'qituvchi boti. Har biri yiqilsa 5 soniyada o'zi qayta turadi.
 ILDIZ="$HOME/milliy_sertifikat"
 RUN="$ILDIZ/run"
@@ -20,6 +20,8 @@ TUNNEL=ngrok; NGROK_DOMEN=""; PORT=8123; ISHCHILAR=2; OQIMLAR=8
 export PYTHONUNBUFFERED=1 PYTHONIOENCODING=utf-8
 
 QISMLAR=(tunnel django bot oqituvchi)
+# TUNNEL=kompyuter: ngrok kompyuterda ishlaydi va USB (adb forward) orqali shu serverga ulanadi
+[ "$TUNNEL" = kompyuter ] && QISMLAR=(django bot oqituvchi)
 
 tirikmi() { [ -f "$RUN/$1.pid" ] && kill -0 "$(cat "$RUN/$1.pid")" 2>/dev/null; }
 
@@ -80,7 +82,10 @@ start() {
 
   yashil "1/4  Tunnel ($TUNNEL)…"
   : > "$LOG/tunnel.log"
-  if [ "$TUNNEL" = cloudflare ]; then
+  if [ "$TUNNEL" = kompyuter ]; then
+    [ -n "$NGROK_DOMEN" ] || { qizil "sozlama.env da NGROK_DOMEN yo'q."; exit 1; }
+    echo "     ngrok kompyuterda; manzil: $NGROK_DOMEN"
+  elif [ "$TUNNEL" = cloudflare ]; then
     fonda tunnel cloudflared tunnel --no-autoupdate --url "http://127.0.0.1:$PORT"
   else
     [ -x "$ILDIZ/bin/ngrok" ] || { qizil "ngrok o'rnatilmagan — ornatish.sh ni qayta ishga tushiring."; exit 1; }
@@ -91,7 +96,9 @@ start() {
       http "$PORT" "${qosh[@]}" --config "$ILDIZ/ngrok.yml" --log stdout
   fi
   local url="" i
+  [ "$TUNNEL" = kompyuter ] && url="$NGROK_DOMEN"
   for i in $(seq 1 45); do
+    [ -n "$url" ] && break
     url="$(tunnel_manzili)"; [ -n "$url" ] && break; sleep 1
   done
   if [ -z "$url" ]; then

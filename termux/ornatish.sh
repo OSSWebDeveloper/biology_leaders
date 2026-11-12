@@ -116,7 +116,9 @@ for nom in DejaVuSans.ttf DejaVuSans-Bold.ttf; do
 done
 
 yashil "5/6  ngrok…"
-if [ ! -x "$ILDIZ/bin/ngrok" ]; then
+if grep -qs '^TUNNEL=kompyuter' "$ILDIZ/sozlama.env"; then
+  echo "     kerak emas — ngrok kompyuterda ishlaydi."
+elif [ ! -x "$ILDIZ/bin/ngrok" ]; then
   case "$(uname -m)" in
     aarch64) arx=arm64 ;; armv7l|armv8l) arx=arm ;; x86_64) arx=amd64 ;; *) arx=arm64 ;;
   esac

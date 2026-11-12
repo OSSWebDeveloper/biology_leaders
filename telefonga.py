@@ -24,6 +24,7 @@ import shutil
 import subprocess
 import sys
 import time
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -269,13 +270,65 @@ def kompyuterni_toxtat():
     sarlavha("Kompyuterdagi server, botlar va ngrok to'xtatilmoqda")
     for nom in ('Biology Django*', 'Biology Bot*', 'Biology Oqituvchi*', 'Biology Ngrok*', 'Biology Server*'):
         subprocess.run(['taskkill', '/fi', 'WINDOWTITLE eq ' + nom, '/t', '/f'], capture_output=True)
+    # adb.exe ham 8123 ni tinglaydi (telefonga USB yo'naltirish) — uni o'ldirmaslik kerak, aks holda
+    # SSH ulanishi ham uziladi
     ps = ("Get-NetTCPConnection -State Listen -LocalPort 8123 -ErrorAction SilentlyContinue | "
+          "Where-Object { (Get-Process -Id $_.OwningProcess -ErrorAction SilentlyContinue).Name -ne 'adb' } | "
           "ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }; "
           "Get-CimInstance Win32_Process | Where-Object { ($_.Name -eq 'ngrok.exe' -and $_.CommandLine -match 'http 8123') "
           "-or ($_.CommandLine -match 'manage.py (runbot|runteacherbot)' -and $_.CommandLine -match 'python') } | "
           "ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }")
     subprocess.run(['powershell', '-NoProfile', '-Command', ps], capture_output=True)
     print("To'xtatildi (bitta bot tokeni va ngrok domeni bir vaqtda faqat bitta joyda ishlaydi).")
+
+
+NGROK_DOMEN = 'https://roughy-outgoing-iguana.ngrok-free.app'
+NGROK_EXE = (r'D:\asosiy\ngrok.exe' if os.path.exists(r'D:\asosiy\ngrok.exe') else shutil.which('ngrok'))
+SERVER_PORT = 8123
+
+
+def tunnel_bormi():
+    try:
+        d = json.load(urllib.request.urlopen('http://127.0.0.1:4040/api/tunnels', timeout=2))
+    except Exception:
+        return False
+    return any(x.get('public_url') == NGROK_DOMEN for x in d.get('tunnels', []))
+
+
+def kompyuterda_ngrok():
+    """Kompyuterning 8123-porti USB orqali telefondagi serverga ulanadi, ngrok shu portni ochadi."""
+    sarlavha('9. Kompyuterda ngrok (telefonga USB orqali)')
+    port = str(SERVER_PORT)
+    adb('forward', 'tcp:' + port, 'tcp:' + port, tekshir=True)
+    try:
+        urllib.request.urlopen('http://127.0.0.1:%s/' % port, timeout=20)
+    except urllib.error.HTTPError:
+        pass  # server javob berdi (302/404 ham bo'ladi) — ulanish bor
+    except Exception as e:
+        kompyuterni_yoq()
+        xato("kompyuter telefondagi serverga USB orqali ulana olmadi: %s" % e)
+    print('USB ulanish: kompyuter :%s → telefon :%s' % (port, port))
+    if not NGROK_EXE:
+        xato(r'ngrok.exe topilmadi (D:\asosiy\ngrok.exe).')
+    if not tunnel_bormi():
+        # /d — cmd AutoRun (chcp 1251) ishlamasin; alohida oyna: bat yopilsa ham ngrok ishlab turadi
+        subprocess.Popen('cmd /d /s /k "title Biology Ngrok& "%s" http %s --url %s"'
+                         % (NGROK_EXE, port, NGROK_DOMEN), creationflags=subprocess.CREATE_NEW_CONSOLE)
+        for _ in range(30):
+            time.sleep(1)
+            if tunnel_bormi():
+                break
+        else:
+            xato("ngrok ochilmadi — «Biology Ngrok» oynasidagi xabarni o'qing.")
+    so_rov = urllib.request.Request(NGROK_DOMEN + '/', headers={'ngrok-skip-browser-warning': '1',
+                                                                'User-Agent': 'biology-setup'})
+    try:
+        urllib.request.urlopen(so_rov, timeout=30)
+        print('Tekshirildi: %s ochilyapti.' % NGROK_DOMEN)
+    except urllib.error.HTTPError as e:
+        print('Tekshirildi: %s javob berdi (HTTP %s).' % (NGROK_DOMEN, e.code))
+    except Exception as e:
+        print("Diqqat: %s tekshirilmadi (%s) — brauzerda ochib ko'ring." % (NGROK_DOMEN, e))
 
 
 SERVER_BAT = Path(os.path.expanduser('~')) / 'Desktop' / 'BiologyServerRun.bat'
@@ -287,6 +340,8 @@ def kompyuterni_yoq():
     if not SERVER_BAT.exists():
         print("BiologyServerRun.bat topilmadi (%s) — botni o'zingiz yoqing." % SERVER_BAT)
         return
+    # 8123 telefonga yo'naltirilgan bo'lsa, kompyuterdagi Django u portni ola olmaydi
+    adb('forward', '--remove', 'tcp:%d' % SERVER_PORT)
     # os.startfile — alohida oyna; shu oynaning kodirovkasiga tegmaydi (cmd AutoRun'dagi chcp 1251)
     os.startfile(str(SERVER_BAT))
     print('Yoqildi: alohida «Biology Server» oynasi ochildi — bot avvalgidek kompyuterda ishlaydi.')
@@ -333,12 +388,20 @@ def main():
     if not toxtatildi:
         kompyuterni_toxtat()
 
-    sarlavha('8. Telefonda ishga tushirilmoqda')
-    kod, _ = ssh('bio start', korsat=True)
+    sarlavha('8. Telefonda server va botlar ishga tushirilmoqda')
+    # ngrok kompyuterda bo'ladi: telefon tunnel ochmaydi, manzil — doimiy ngrok domeni
+    ssh("cd ~/milliy_sertifikat && sed -i 's/^TUNNEL=.*/TUNNEL=kompyuter/' sozlama.env && "
+        "(grep -q '^NGROK_DOMEN=' sozlama.env && sed -i 's#^NGROK_DOMEN=.*#NGROK_DOMEN=%s#' sozlama.env "
+        "|| echo NGROK_DOMEN=%s >> sozlama.env)" % (NGROK_DOMEN, NGROK_DOMEN))
+    kod, _ = ssh('bio stop >/dev/null; bio start', korsat=True)
     if kod:
-        xato("ishga tushmadi. Telefonda Termux'ni ochib `bio log tunnel` yoki `bio log bot` ni ko'ring.")
-    print('\nTAYYOR. Kabelni ajratsangiz bo\'ladi — sayt va botlar telefonda ishlayapti.')
-    print("Telefon qayta yoqilsa: Termux'ni ochib  bio start  deb yozing (yoki shu bat'ni qayta bosing).")
+        kompyuterni_yoq()
+        xato("telefonda ishga tushmadi. Termux'da `bio log django` yoki `bio log bot` ni ko'ring.")
+
+    kompyuterda_ngrok()
+    print('\nTAYYOR: sayt va ikkala bot TELEFONDA ishlayapti, ngrok — kompyuterda (%s).' % NGROK_DOMEN)
+    print('USB kabelni AJRATMANG va «Biology Ngrok» oynasini yopmang — sayt shular orqali ochiladi.')
+    print("Kabel uzilsa yoki kompyuter qayta yoqilsa: shu bat'ni qayta bosing.")
     return 0
 
 

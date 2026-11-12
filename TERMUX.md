@@ -18,7 +18,15 @@ Bat (`telefonga.py`) o'zi: telefonni topadi → Termux yo'q bo'lsa rasmiy GitHub
 Termux uchun batareya cheklovini olib tashlaydi → Termux'da SSH'ni yoqadi (birinchi marta
 buyruqni telefonga o'zi teradi — ekranga tegmang) → telefondagi bazani kompyuterga
 `telefon_zaxira/` ga oladi → paketni USB orqali yuboradi va o'rnatadi → kompyuterdagi
-«Biology» server/bot/ngrok'ni to'xtatadi → telefonda `bio start`.
+«Biology» server/bot/ngrok'ni to'xtatadi → telefonda `bio start` (sayt + ikkala bot) →
+**kompyuterda ngrok** ochadi va uni USB orqali telefondagi serverga ulaydi.
+
+Shuning uchun **USB kabel ulangan turishi va «Biology Ngrok» oynasi ochiq turishi kerak** —
+server telefonda, internetga chiqish (ngrok) kompyuterda. Kabel uzilsa yoki kompyuter qayta
+yoqilsa, bat'ni yana bosing.
+
+Telefondagi Termux Google Play'dan o'rnatilgan bo'lsa, bat uni rasmiy GitHub versiyasiga
+almashtirishni taklif qiladi (Play versiyasining omborida PDF kutubxonasi yo'q).
 
 Keyin ham har safar kodni yangilash uchun shu bat'ning o'zini bosasiz: telefondagi baza
 saqlanadi (va kompyuterga zaxiralanadi). Bazani kompyuterdagisi bilan almashtirish:
