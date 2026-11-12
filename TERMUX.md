@@ -4,6 +4,25 @@ Bot hostga qo'yilmaydi: sayt va ikkala bot Android telefonda ishlaydi, internetg
 tunnel (ngrok yoki Cloudflare) orqali chiqadi. Telegram Web App https talab qiladi —
 tunnel shuni beradi.
 
+## Eng oson yo'l: bitta bat
+
+1. Telefonda bir marta: «Настройки → О телефоне» da «Номер сборки» ni 7 marta bosing,
+   so'ng «Для разработчиков → **Отладка по USB**» ni yoqing.
+2. Telefonni USB bilan ulang, ekran qulfini oching.
+3. Ish stolidagi **«Biology telefonga.bat»** ni bosing (yoki loyihadagi xuddi shu fayl).
+
+Bat (`telefonga.py`) o'zi: telefonni topadi → Termux yo'q bo'lsa rasmiy GitHub'dan o'rnatadi →
+Termux uchun batareya cheklovini olib tashlaydi → Termux'da SSH'ni yoqadi (birinchi marta
+buyruqni telefonga o'zi teradi — ekranga tegmang) → telefondagi bazani kompyuterga
+`telefon_zaxira/` ga oladi → paketni USB orqali yuboradi va o'rnatadi → kompyuterdagi
+«Biology» server/bot/ngrok'ni to'xtatadi → telefonda `bio start`.
+
+Keyin ham har safar kodni yangilash uchun shu bat'ning o'zini bosasiz: telefondagi baza
+saqlanadi (va kompyuterga zaxiralanadi). Bazani kompyuterdagisi bilan almashtirish:
+`Biology telefonga.bat --baza-bilan`.
+
+Quyidagi qo'lda yo'l — bat ishlamagan holatlar uchun.
+
 ## 1. Telefonga Termux
 
 **F-Droid** yoki GitHub (`termux/termux-app` → Releases) dan o'rnating. Play Market'dagi

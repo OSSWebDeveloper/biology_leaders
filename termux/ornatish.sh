@@ -24,20 +24,29 @@ yashil() { printf '\033[1;32m%s\033[0m\n' "$*"; }
 sariq()  { printf '\033[1;33m%s\033[0m\n' "$*"; }
 qizil()  { printf '\033[1;31m%s\033[0m\n' "$*"; }
 
-if [ ! -d "$HOME/storage" ]; then
-  sariq "Telefon xotirasiga ruxsat so'ralmoqda — «Разрешить / Allow» ni bosing."
-  termux-setup-storage || true
-  sleep 3
-fi
+# Xotiraga ruxsat faqat zip telefon xotirasida bo'lsa kerak (kompyuterdan SSH bilan
+# yuborilganda zip to'g'ridan-to'g'ri ~ ga tushadi)
+case "$ZIP" in
+  "$HOME/storage/"*)
+    if [ ! -d "$HOME/storage" ]; then
+      sariq "Telefon xotirasiga ruxsat so'ralmoqda — «Разрешить / Allow» ni bosing."
+      termux-setup-storage || true
+      sleep 3
+    fi ;;
+esac
 if [ ! -f "$ZIP" ]; then
   qizil "Zip topilmadi: $ZIP"
-  echo "Kompyuterda:  python termux_paket.py   — u zip'ni telefonning Download papkasiga qo'yadi."
+  echo "Kompyuterda «Biology telefonga.bat» ni ishga tushiring."
   exit 1
 fi
 
 yashil "1/6  Termux paketlari (birinchi marta 10-20 daqiqa)…"
-pkg update -y
-pkg install -y python python-pip python-pymupdf python-pillow ttf-dejavu \
+# Hech narsa so'ramasin: kompyuterdan SSH orqali ham, qo'lda ham bir xil ishlaydi
+export DEBIAN_FRONTEND=noninteractive
+APT=(apt-get -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold)
+"${APT[@]}" update
+"${APT[@]}" full-upgrade
+"${APT[@]}" install python python-pip python-pymupdf python-pillow ttf-dejavu \
                clang rust make binutils proot resolv-conf curl openssl-tool cloudflared util-linux
 
 yashil "2/6  Python kutubxonalari (pydantic-core telefonda yig'iladi — sabr qiling)…"
