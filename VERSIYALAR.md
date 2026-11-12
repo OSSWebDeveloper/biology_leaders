@@ -1,5 +1,12 @@
 # Versiyalar tarixi
 
+## 1.28.2 — 2026-11-12
+
+Telefonga o'rnatish: eskirgan Termux oynasi tuzatildi
+
+- Termux oynasi (termux.net) eskirgan bo'lib python-pymupdf yo'q bo'lsa, rasmiy omborga o'tiladi
+- Telefonga o'rnatish xato bilan to'xtasa, kompyuterdagi bot o'zi qayta yoqiladi
+
 ## 1.28.1 — 2026-11-12
 
 Telefon menyulari inglizcha nomlarda

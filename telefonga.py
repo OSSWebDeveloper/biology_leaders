@@ -245,6 +245,19 @@ def kompyuterni_toxtat():
     print("To'xtatildi (bitta bot tokeni va ngrok domeni bir vaqtda faqat bitta joyda ishlaydi).")
 
 
+SERVER_BAT = Path(os.path.expanduser('~')) / 'Desktop' / 'BiologyServerRun.bat'
+
+
+def kompyuterni_yoq():
+    """Telefonga o'rnatish muvaffaqiyatsiz bo'lsa — kompyuterdagi bot qayta yoqiladi."""
+    sarlavha("Kompyuterdagi server va botlar qayta yoqilmoqda")
+    if not SERVER_BAT.exists():
+        print("BiologyServerRun.bat topilmadi (%s) — botni o'zingiz yoqing." % SERVER_BAT)
+        return
+    subprocess.Popen(['cmd', '/c', 'start', '', str(SERVER_BAT)], cwd=str(ILDIZ))
+    print('Yoqildi: alohida «Biology Server» oynasi ochildi — bot avvalgidek kompyuterda ishlaydi.')
+
+
 def main():
     a = argparse.ArgumentParser(description='Botni telefonga o\'rnatish va ishga tushirish')
     a.add_argument('--baza-bilan', action='store_true',
@@ -276,9 +289,11 @@ def main():
     kod, _ = ssh('bash ~/ornatish.sh ~/biology_termux.zip' + (' --baza-bilan' if args.baza_bilan else ''),
                  korsat=True)
     if kod:
-        xato("telefonda o'rnatish to'xtadi (yuqoridagi xabarni o'qing). Kompyuterdagi bot "
-             + ("to'xtatilgan — kerak bo'lsa BiologyServerRun.bat bilan qayta yoqing." if toxtatildi
-                else "ishlashda davom etyapti."))
+        if toxtatildi:
+            kompyuterni_yoq()
+        else:
+            print("\nKompyuterdagi bot ishlashda davom etyapti.")
+        xato("telefonda o'rnatish to'xtadi (yuqoridagi xabarni o'qing).")
     ssh('rm -f ~/biology_termux.zip')
 
     if not toxtatildi:
