@@ -249,8 +249,13 @@ def batareya():
 
 
 def termux_oldindami():
-    oyna = re.search(r'mCurrentFocus=.*', adb('shell', 'dumpsys', 'window', 'windows'))
-    return bool(oyna and 'com.termux/' in oyna.group(0))
+    # `dumpsys window windows` ba'zi telefonlarda (TECNO) mCurrentFocus'ni ko'rsatmaydi —
+    # to'liq `dumpsys window` va zaxira sifatida faol activity tekshiriladi
+    oyna = re.search(r'mCurrentFocus=.*', adb('shell', 'dumpsys', 'window'))
+    if oyna:
+        return 'com.termux/' in oyna.group(0)
+    faol = re.search(r'(?:topResumedActivity|mResumedActivity)=.*', adb('shell', 'dumpsys', 'activity', 'activities'))
+    return bool(faol and 'com.termux/' in faol.group(0))
 
 
 def termuxni_old_ga():

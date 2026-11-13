@@ -1,5 +1,11 @@
 # Versiyalar tarixi
 
+## 1.32.1 — 2026-11-13
+
+Termux ekranda ekanini aniqlash tuzatildi
+
+- TECNO'da dumpsys window windows mCurrentFocus bermaydi — to'liq dumpsys window va faol activity tekshiriladi
+
 ## 1.32.0 — 2026-11-13
 
 6 ta yorliq, qism-qism boshqarish, telefonsiz kompyuter rejimi
