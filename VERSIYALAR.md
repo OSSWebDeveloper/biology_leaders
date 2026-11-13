@@ -1,5 +1,12 @@
 # Versiyalar tarixi
 
+## 1.32.2 — 2026-11-13
+
+Jonli oyna: bot voqealari va faqat bugungi kun
+
+- Jonli oynada bot xabarlari/xatolari ko'rinmasdi (buzilgan grep) — tuzatildi
+- Faqat bugungi voqealar ko'rsatiladi (kunlar aralashmaydi)
+
 ## 1.32.1 — 2026-11-13
 
 Termux ekranda ekanini aniqlash tuzatildi

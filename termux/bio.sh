@@ -223,13 +223,15 @@ kuzat() {
       echo "  $(grep -m1 '^WEBAPP_URL=' .env | cut -d= -f2- | sed 's#https://##')"
       echo
       printf '\033[1m  Oxirgi voqealar:\033[0m\n'
-      # sayt so'rovlari va botlardagi xabarlar/xatolar — vaqt bo'yicha aralash
+      # Faqat BUGUNGI voqealar: sayt so'rovlari va botlardagi xabarlar/xatolar — vaqt bo'yicha aralash
+      local bugun_d bugun_b
+      bugun_d="$(date +%d/%b/%Y)"; bugun_b="$(date +%F)"
       {
-        grep -ah '"\(GET\|POST\) ' "$LOG/django.log" 2>/dev/null | tail -n 8 |
+        grep -aF "[$bugun_d:" "$LOG/django.log" 2>/dev/null | grep -aE '"(GET|POST) ' | tail -n 8 |
           sed -E 's#^.*\[[0-9]+/[A-Za-z]+/[0-9]+:([0-9:]+) [^]]*\] "(GET|POST) ([^ ?]*)[^"]*" ([0-9]+).*#\1 sayt \2 \3 \4#'
-        grep -ah 'is handled|ERROR'\|grep -ah 'is handled|ERROR'\|grep -ah 'is handled|ERROR' "$LOG/bot.log" 2>/dev/null | tail -n 5 |
+        grep -a "^$bugun_b" "$LOG/bot.log" 2>/dev/null | grep -aE 'is handled|ERROR' | tail -n 5 |
           sed -E 's#^[0-9-]+ ([0-9:]+),[0-9]+ (.*)#\1 o'"'"'quvchi boti: \2#; s#Update id=[0-9]+ is handled.*#xabar qabul qilindi#'
-        grep -ah 'is handled|ERROR'\|grep -ah 'is handled|ERROR'\|grep -ah 'is handled|ERROR' "$LOG/oqituvchi.log" 2>/dev/null | tail -n 5 |
+        grep -a "^$bugun_b" "$LOG/oqituvchi.log" 2>/dev/null | grep -aE 'is handled|ERROR' | tail -n 5 |
           sed -E 's#^[0-9-]+ ([0-9:]+),[0-9]+ (.*)#\1 o'"'"'qituvchi boti: \2#; s#Update id=[0-9]+ is handled.*#xabar qabul qilindi#'
       } | sort | tail -n 12 | sed 's/^/  /' | cut -c1-"$en"
       echo
